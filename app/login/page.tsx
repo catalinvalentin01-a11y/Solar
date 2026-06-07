@@ -4,13 +4,13 @@ import { supabase } from "@/lib/supabase";
 
 export default function LoginPage() {
   const loginWithGoogle = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/today`,
-      },
-    });
-  };
+  await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: `${window.location.origin}/projects`,
+    },
+  });
+};
 
   return (
     <div className="flex items-center justify-center h-screen">

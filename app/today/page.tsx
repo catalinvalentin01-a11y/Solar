@@ -24,27 +24,11 @@ type Filter = "all" | "today" | "tomorrow";
 export default function TodayPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selected, setSelected] = useState<Project | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
 
-  const today = new Date();
-  const todayStr = today.toISOString().split("T")[0];
-
-  const tomorrow = new Date();
-  tomorrow.setDate(today.getDate() + 1);
-  const tomorrowStr = tomorrow.toISOString().split("T")[0];
-
-  // ================= USER CHECK =================
-  useEffect(() => {
-    const checkUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      const email = data.user?.email;
-
-      setIsAdmin(email === "catalinvalentin01@gmail.com");
-    };
-
-    checkUser();
-  }, []);
+  // 🔥 FIX ZONE (timezone safe)
+  const todayStr = new Date().toLocaleDateString("en-CA");
+  const tomorrowStr = new Date(Date.now() + 86400000).toLocaleDateString("en-CA");
 
   // ================= LOAD PROJECTS =================
   useEffect(() => {
@@ -60,7 +44,7 @@ export default function TodayPage() {
     load();
   }, []);
 
-  // ================= FILTER LOGIC =================
+  // ================= FILTER =================
   const filteredProjects = projects.filter((p) => {
     if (filter === "all") return true;
     if (filter === "today") return p.date === todayStr;
@@ -70,18 +54,13 @@ export default function TodayPage() {
 
   return (
     <AuthGuard>
-    <>
       <div className="p-4 space-y-4 bg-gray-100 min-h-screen">
 
         <h1 className="text-2xl font-bold">
           📍 Plan montaj
         </h1>
 
-        <p className="text-sm text-gray-500">
-          Admin: {String(isAdmin)}
-        </p>
-
-        {/* 🔥 FILTER BUTTONS */}
+        {/* FILTER */}
         <div className="flex gap-2 mb-2">
           <button
             onClick={() => setFilter("all")}
@@ -111,34 +90,25 @@ export default function TodayPage() {
           </button>
         </div>
 
+        {/* EMPTY STATE */}
         {filteredProjects.length === 0 && (
           <p className="text-gray-500">
             Nu există proiecte în perioada selectată
           </p>
         )}
 
+        {/* LIST */}
         {filteredProjects.map((p) => (
           <div
             key={p.id}
             className="bg-white rounded-xl p-4 shadow active:scale-[0.98] transition"
             onClick={() => setSelected(p)}
           >
-            <div className="text-lg font-bold">
-              {p.client}
-            </div>
+            <div className="text-lg font-bold">{p.client}</div>
+            <div className="text-gray-600">📍 {p.location}</div>
 
-            <div className="text-gray-600">
-              📍 {p.location}
-            </div>
-
-            <div className="mt-2">
-              📅 {p.date}
-            </div>
-
-            <div className="mt-2">
-              ⚡ {p.kw} kW
-            </div>
-
+            <div className="mt-2">📅 {p.date}</div>
+            <div className="mt-2">⚡ {p.kw} kW</div>
             <div>🔋 {p.battery}</div>
             <div>📦 {p.panels} panouri</div>
             <div>📞 {p.phone}</div>
@@ -150,10 +120,9 @@ export default function TodayPage() {
         ))}
       </div>
 
-      {/* 🔥 MODAL */}
+      {/* MODAL */}
       {selected && (
         <div className="fixed inset-0 bg-black/60 flex items-end z-50">
-
           <div className="bg-white w-full rounded-t-2xl p-4">
 
             <div className="text-lg font-bold mb-2">
@@ -164,14 +133,8 @@ export default function TodayPage() {
               📍 {selected.location}
             </div>
 
-            <div className="mt-2">
-              📅 {selected.date}
-            </div>
-
-            <div className="mt-2">
-              ⚡ {selected.kw} kW
-            </div>
-
+            <div className="mt-2">📅 {selected.date}</div>
+            <div className="mt-2">⚡ {selected.kw} kW</div>
             <div>🔋 {selected.battery}</div>
             <div>📦 {selected.panels}</div>
 
@@ -180,7 +143,6 @@ export default function TodayPage() {
             </div>
 
             <div className="flex gap-2 mt-4">
-
               <a
                 href={`tel:${selected.phone}`}
                 className="flex-1 bg-green-600 text-white text-center py-2 rounded"
@@ -195,7 +157,6 @@ export default function TodayPage() {
               >
                 🧭 GPS
               </a>
-
             </div>
 
             <button
@@ -208,7 +169,6 @@ export default function TodayPage() {
           </div>
         </div>
       )}
-    </>
     </AuthGuard>
   );
 }

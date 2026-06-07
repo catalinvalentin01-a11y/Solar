@@ -50,7 +50,7 @@ const [openLightbox, setOpenLightbox] = useState(false);
   const [selectedProject, setSelectedProject] =
     useState<Project | null>(null);
 
-  const [isAdmin, setIsAdmin] = useState(false);
+  
 
   const [showClient, setShowClient] = useState(true);
   const [showTechnical, setShowTechnical] = useState(true);
@@ -129,7 +129,7 @@ const [openLightbox, setOpenLightbox] = useState(false);
     console.log("USER:", data.user);
     console.log("EMAIL:", email);
 
-    setIsAdmin(email === ADMIN_EMAIL);
+   
   };
 
   checkUser();
@@ -346,7 +346,7 @@ const [openLightbox, setOpenLightbox] = useState(false);
         Calendar Montaje
       </h1>
    <p className="text-red-500">
-  Admin: {String(isAdmin)}
+ 
 </p>
 
       <FullCalendar
@@ -355,7 +355,7 @@ const [openLightbox, setOpenLightbox] = useState(false);
         initialView="dayGridMonth"
         events={events}
         dateClick={(info) => {
-          if (!isAdmin) return;
+   
 
           setSelectedProject(null);
           setSelectedDate(info.dateStr);
@@ -432,7 +432,7 @@ const [openLightbox, setOpenLightbox] = useState(false);
               <div className="grid grid-cols-2 gap-2 p-2">
 
                 <input
-                  disabled={!isAdmin}
+ 
                   className="border p-2"
                   placeholder="Client"
                   value={form.client}
@@ -445,7 +445,7 @@ const [openLightbox, setOpenLightbox] = useState(false);
                 />
 
                 <input
-                  disabled={!isAdmin}
+
                   className="border p-2"
                   placeholder="Telefon"
                   value={form.phone}
@@ -458,7 +458,7 @@ const [openLightbox, setOpenLightbox] = useState(false);
                 />
 
                 <input
-                  disabled={!isAdmin}
+   
                   className="border p-2"
                   placeholder="Email"
                   value={form.email}
@@ -471,7 +471,7 @@ const [openLightbox, setOpenLightbox] = useState(false);
                 />
 
                 <input
-                  disabled={!isAdmin}
+   
                   className="border p-2"
                   placeholder="Locație"
                   value={form.location}
@@ -500,7 +500,7 @@ const [openLightbox, setOpenLightbox] = useState(false);
               <div className="grid grid-cols-2 gap-2 p-2">
 
                 <input
-                  disabled={!isAdmin}
+  
                   className="border p-2"
                   placeholder="Titlu proiect"
                   value={form.title}
@@ -513,7 +513,7 @@ const [openLightbox, setOpenLightbox] = useState(false);
                 />
 
                 <input
-                  disabled={!isAdmin}
+    
                   className="border p-2"
                   placeholder="kW"
                   value={form.kw}
@@ -526,7 +526,7 @@ const [openLightbox, setOpenLightbox] = useState(false);
                 />
 
                 <input
-                  disabled={!isAdmin}
+        
                   className="border p-2"
                   placeholder="Panouri"
                   value={form.panels}
@@ -539,7 +539,7 @@ const [openLightbox, setOpenLightbox] = useState(false);
                 />
 
                 <input
-                  disabled={!isAdmin}
+   
                   className="border p-2"
                   placeholder="Invertor"
                   value={form.inverter}
@@ -552,7 +552,7 @@ const [openLightbox, setOpenLightbox] = useState(false);
                 />
 
                 <input
-                  disabled={!isAdmin}
+        
                   className="border p-2"
                   placeholder="Baterie"
                   value={form.battery}
@@ -565,7 +565,7 @@ const [openLightbox, setOpenLightbox] = useState(false);
                 />
 
                 <select
-                  disabled={!isAdmin}
+           
                   className="border p-2"
                   value={form.status}
                   onChange={(e) =>
@@ -581,7 +581,7 @@ const [openLightbox, setOpenLightbox] = useState(false);
                 </select>
 
                 <textarea
-                  disabled={!isAdmin}
+             
                   className="border p-2 col-span-2"
                   placeholder="Observații"
                   rows={4}
@@ -610,7 +610,7 @@ const [openLightbox, setOpenLightbox] = useState(false);
             {showRoof && (
               <div className="p-2">
 
-                {isAdmin && (
+                
                   <input
                     type="file"
                     accept="image/*"
@@ -627,7 +627,7 @@ const [openLightbox, setOpenLightbox] = useState(false);
                       );
                     }}
                   />
-                )}
+                
 
                 <div className="grid grid-cols-3 gap-2">
       {form.roof_images.map((img, i) => (
@@ -663,7 +663,7 @@ const [openLightbox, setOpenLightbox] = useState(false);
             {showSimulation && (
               <div className="p-2">
 
-                {isAdmin && (
+                
                   <input
                     type="file"
                     accept="image/*"
@@ -680,7 +680,7 @@ const [openLightbox, setOpenLightbox] = useState(false);
                       );
                     }}
                   />
-                )}
+                
 
                 <div className="grid grid-cols-3 gap-2">
                  {form.simulation_images.map((img, i) => (
@@ -711,16 +711,16 @@ const [openLightbox, setOpenLightbox] = useState(false);
                 Închide
               </button>
 
-              {isAdmin && !selectedProject && (
+              
                 <button
                   className="bg-blue-600 text-white px-4 py-2 rounded"
                   onClick={handleSave}
                 >
                   Salvează
                 </button>
-              )}
+              
 
-              {isAdmin && selectedProject && (
+             
                 <>
                   <button
                     className="bg-blue-600 text-white px-4 py-2 rounded"
@@ -736,7 +736,7 @@ const [openLightbox, setOpenLightbox] = useState(false);
                     Șterge
                   </button>
                 </>
-              )}
+              
 
             </div>
 
