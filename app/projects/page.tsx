@@ -348,7 +348,7 @@ const [openLightbox, setOpenLightbox] = useState(false);
   };
     return (
         <AuthGuard>
-    <div className="p-6">
+    <div className="p-2 md:p-6">
       <h1 className="text-2xl font-bold mb-4 text-red-600">
   TEST 123456
 </h1>
@@ -356,11 +356,11 @@ const [openLightbox, setOpenLightbox] = useState(false);
  
 </p>
 
-      <FullCalendar
-      
-        plugins={[dayGridPlugin, interactionPlugin]}
-        initialView="dayGridMonth"
-        events={events}
+      <div className="overflow-x-auto">
+  <FullCalendar
+  plugins={[dayGridPlugin, interactionPlugin]}
+  initialView="dayGridMonth"
+  height="auto"
         dateClick={(info) => {
    
 
@@ -403,7 +403,7 @@ const [openLightbox, setOpenLightbox] = useState(false);
         }}
       />
 
-      {false && (
+      {open && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center">
           <div
             className="fixed inset-0 bg-black/60"
