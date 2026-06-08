@@ -16,7 +16,7 @@ export default function RootLayout({
      <body className="min-h-screen flex flex-col md:flex-row">
 
         {/* SIDEBAR */}
-        <aside className="w-64 bg-gray-900 text-white p-4 space-y-3">
+       <aside className="w-full md:w-64 bg-gray-900 text-white p-4 space-y-3">
           <h1 className="text-xl font-bold mb-4">☀️ Solar CRM</h1>
 
           <nav className="space-y-2">

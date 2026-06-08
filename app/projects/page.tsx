@@ -145,25 +145,29 @@ const [openLightbox, setOpenLightbox] = useState(false);
   // ================= LOAD =================
 
   async function loadProjects() {
-    const { data, error } = await supabase
-      .from("projects")
-      .select("*");
+  const { data, error } = await supabase
+    .from("projects")
+    .select("*")
+    .order("date", { ascending: true });
 
-    if (error) {
-      console.error(error);
-      return;
-    }
-
-    const calendarEvents =
-      data?.map((project) => ({
-        id: project.id,
-        title: `${project.client} - ${project.title}`,
-        date: project.date,
-        extendedProps: project,
-      })) || [];
-
-    setEvents(calendarEvents);
+  if (error) {
+    console.error(error);
+    return;
   }
+
+  const calendarEvents = (data || []).map((project) => ({
+    id: project.id,
+    title: `${project.client} - ${project.title}`,
+    date: project.date,
+    extendedProps: { ...project },
+  }));
+
+  console.log("PROJECTS:", data);
+  console.log("EVENTS:", calendarEvents);
+
+  // 🔥 IMPORTANT FIX: forțează re-render nou
+  setEvents([...calendarEvents]);
+}
 
   useEffect(() => {
     loadProjects();
@@ -219,7 +223,7 @@ const [openLightbox, setOpenLightbox] = useState(false);
   }
 
   resetForm();
-  loadProjects();
+await loadProjects();
 };
 
   // ================= UPDATE =================
