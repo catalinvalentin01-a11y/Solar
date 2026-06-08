@@ -358,11 +358,12 @@ const [openLightbox, setOpenLightbox] = useState(false);
 
       <div className="overflow-x-auto">
   <FullCalendar
+  
   plugins={[dayGridPlugin, interactionPlugin]}
   initialView="dayGridMonth"
   height="auto"
         dateClick={(info) => {
-   
+
 
           setSelectedProject(null);
           setSelectedDate(info.dateStr);
@@ -401,7 +402,9 @@ const [openLightbox, setOpenLightbox] = useState(false);
 
           setOpen(true);
         }}
+
       />
+      </div>
 
       {open && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center">

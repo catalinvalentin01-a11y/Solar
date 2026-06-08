@@ -13,7 +13,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ro">
-      <body className="h-screen flex">
+     <body className="min-h-screen flex flex-col md:flex-row">
 
         {/* SIDEBAR */}
         <aside className="w-64 bg-gray-900 text-white p-4 space-y-3">
@@ -35,7 +35,7 @@ export default function RootLayout({
         </aside>
 
         {/* CONTINUT */}
-        <main className="flex-1 bg-gray-50 p-6">
+        <main className="flex-1 bg-gray-50 p-6 overflow-auto">
           {children}
         </main>
 
