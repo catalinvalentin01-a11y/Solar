@@ -36,7 +36,14 @@ type Project = {
 
 export default function ProjectsPage() {
   const [events, setEvents] = useState<any[]>([]);
-  const [open, setOpen] = useState(false);
+ const [open, setOpen] = useState(false);
+
+useEffect(() => {
+  console.log("OPEN =", open);
+}, [open]);
+useEffect(() => {
+  setOpen(false);
+}, []);
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
 const [activeIndex, setActiveIndex] = useState(0);
 const [openLightbox, setOpenLightbox] = useState(false);
@@ -342,9 +349,9 @@ const [openLightbox, setOpenLightbox] = useState(false);
     return (
         <AuthGuard>
     <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">
-        Calendar Montaje
-      </h1>
+      <h1 className="text-2xl font-bold mb-4 text-red-600">
+  TEST 123456
+</h1>
    <p className="text-red-500">
  
 </p>
@@ -396,14 +403,14 @@ const [openLightbox, setOpenLightbox] = useState(false);
         }}
       />
 
-      {open && (
+      {false && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center">
           <div
             className="fixed inset-0 bg-black/60"
             onClick={() => setOpen(false)}
           />
 
-          <div className="relative bg-white rounded-lg p-6 w-[900px] max-h-[90vh] overflow-y-auto z-[10000]">
+          <div className="relative bg-white rounded-lg p-4 w-[95vw] md:w-[900px] max-h-[90vh] overflow-y-auto z-[10000]">
 
             <div className="flex justify-between items-center mb-4">
               <h2 className="font-bold text-xl">
