@@ -270,10 +270,12 @@ export default function ProjectsPage() {
       <div className="p-2 md:p-6">
 
         <style>{`
+          /* Fix mobil FullCalendar */
           .fc {
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
             text-rendering: optimizeLegibility;
+            font-size: 14px;
           }
           .fc table {
             border-collapse: collapse;
@@ -284,6 +286,60 @@ export default function ProjectsPage() {
           .fc .fc-scrollgrid {
             transform: translateZ(0);
             backface-visibility: hidden;
+          }
+          /* Ziua din calendar - text mai vizibil */
+          .fc .fc-daygrid-day-number {
+            font-size: 14px !important;
+            font-weight: 600 !important;
+            color: #111827 !important;
+            padding: 4px 6px !important;
+          }
+          /* Numele zilelor (Lun, Mar..) */
+          .fc .fc-col-header-cell-cushion {
+            font-size: 13px !important;
+            font-weight: 700 !important;
+            color: #111827 !important;
+            padding: 6px 4px !important;
+          }
+          /* Toolbar - luna si butoanele de navigare */
+          .fc .fc-toolbar-title {
+            font-size: 16px !important;
+            font-weight: 700 !important;
+            color: #111827 !important;
+          }
+          .fc .fc-button {
+            font-size: 13px !important;
+            font-weight: 600 !important;
+            padding: 5px 10px !important;
+          }
+          /* Evenimentele din calendar */
+          .fc .fc-event-title {
+            font-size: 12px !important;
+            font-weight: 600 !important;
+          }
+          /* Ziua de azi - mai vizibila */
+          .fc .fc-day-today {
+            background-color: #eff6ff !important;
+          }
+          .fc .fc-day-today .fc-daygrid-day-number {
+            color: #1d4ed8 !important;
+          }
+          @media (max-width: 640px) {
+            .fc .fc-toolbar-title {
+              font-size: 15px !important;
+            }
+            .fc .fc-toolbar {
+              gap: 6px !important;
+            }
+            .fc .fc-daygrid-day-number {
+              font-size: 13px !important;
+            }
+            .fc .fc-col-header-cell-cushion {
+              font-size: 11px !important;
+            }
+            .fc .fc-event-title {
+              font-size: 11px !important;
+            }
           }
         `}</style>
 
@@ -334,17 +390,17 @@ export default function ProjectsPage() {
             <div className="relative bg-white rounded-lg p-4 w-[95vw] md:w-[900px] max-h-[90vh] overflow-y-auto z-[10000]">
 
               <div className="flex justify-between items-center mb-4">
-                <h2 className="font-bold text-xl">
+                <h2 className="font-bold text-xl text-gray-900">
                   {selectedProject ? "Detalii proiect" : "Proiect nou"}
                 </h2>
-                <span className="text-sm text-gray-500">{selectedDate}</span>
+                <span className="text-sm font-semibold text-gray-600">{selectedDate}</span>
               </div>
 
               {selectedProject && (
-                <div className="flex gap-3 mb-4">
+                <div className="flex flex-wrap gap-3 mb-4">
                   {form.phone && (
                     <button
-                      className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition"
+                      className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition text-sm"
                       onClick={() => handleCall(form.phone)}
                     >
                       📞 Sună — {form.phone}
@@ -352,7 +408,7 @@ export default function ProjectsPage() {
                   )}
                   {form.location && (
                     <button
-                      className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition"
+                      className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition text-sm"
                       onClick={() => handleMaps(form.location)}
                     >
                       📍 GPS — {form.location}
@@ -361,37 +417,38 @@ export default function ProjectsPage() {
                 </div>
               )}
 
+              {/* Sectiune Date Client */}
               <button
-                className="w-full text-left font-bold bg-gray-100 p-3 rounded"
+                className="w-full text-left font-bold text-gray-900 bg-gray-100 p-3 rounded text-base"
                 onClick={() => setShowClient(!showClient)}
               >
-                📋 Date Client
+                📋 Date Client {showClient ? "▲" : "▼"}
               </button>
 
               {showClient && (
-                <div className="grid grid-cols-2 gap-2 p-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-2 mt-1">
                   {isAdmin ? (
                     <>
                       <input
-                        className="border p-2 rounded"
+                        className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500"
                         placeholder="Client"
                         value={form.client}
                         onChange={(e) => setForm({ ...form, client: e.target.value })}
                       />
                       <input
-                        className="border p-2 rounded"
+                        className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500"
                         placeholder="Telefon"
                         value={form.phone}
                         onChange={(e) => setForm({ ...form, phone: e.target.value })}
                       />
                       <input
-                        className="border p-2 rounded"
+                        className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500"
                         placeholder="Email"
                         value={form.email}
                         onChange={(e) => setForm({ ...form, email: e.target.value })}
                       />
                       <input
-                        className="border p-2 rounded"
+                        className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500"
                         placeholder="Locație"
                         value={form.location}
                         onChange={(e) => setForm({ ...form, location: e.target.value })}
@@ -399,70 +456,71 @@ export default function ProjectsPage() {
                     </>
                   ) : (
                     <>
-                      <div className="p-2">
-                        <p className="text-xs text-gray-400">Client</p>
-                        <p className="font-medium">{form.client || "—"}</p>
+                      <div className="p-2 bg-gray-50 rounded">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Client</p>
+                        <p className="font-semibold text-gray-900 text-base mt-1">{form.client || "—"}</p>
                       </div>
-                      <div className="p-2">
-                        <p className="text-xs text-gray-400">Telefon</p>
-                        <p className="font-medium">{form.phone || "—"}</p>
+                      <div className="p-2 bg-gray-50 rounded">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Telefon</p>
+                        <p className="font-semibold text-gray-900 text-base mt-1">{form.phone || "—"}</p>
                       </div>
-                      <div className="p-2">
-                        <p className="text-xs text-gray-400">Email</p>
-                        <p className="font-medium">{form.email || "—"}</p>
+                      <div className="p-2 bg-gray-50 rounded">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Email</p>
+                        <p className="font-semibold text-gray-900 text-base mt-1">{form.email || "—"}</p>
                       </div>
-                      <div className="p-2">
-                        <p className="text-xs text-gray-400">Locație</p>
-                        <p className="font-medium">{form.location || "—"}</p>
+                      <div className="p-2 bg-gray-50 rounded">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Locație</p>
+                        <p className="font-semibold text-gray-900 text-base mt-1">{form.location || "—"}</p>
                       </div>
                     </>
                   )}
                 </div>
               )}
 
+              {/* Sectiune Date Tehnice */}
               <button
-                className="w-full text-left font-bold bg-gray-100 p-3 rounded mt-3"
+                className="w-full text-left font-bold text-gray-900 bg-gray-100 p-3 rounded mt-3 text-base"
                 onClick={() => setShowTechnical(!showTechnical)}
               >
-                ⚡ Date Tehnice
+                ⚡ Date Tehnice {showTechnical ? "▲" : "▼"}
               </button>
 
               {showTechnical && (
-                <div className="grid grid-cols-2 gap-2 p-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-2 mt-1">
                   {isAdmin ? (
                     <>
                       <input
-                        className="border p-2 rounded"
+                        className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500"
                         placeholder="Titlu proiect"
                         value={form.title}
                         onChange={(e) => setForm({ ...form, title: e.target.value })}
                       />
                       <input
-                        className="border p-2 rounded"
+                        className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500"
                         placeholder="kW"
                         value={form.kw}
                         onChange={(e) => setForm({ ...form, kw: e.target.value })}
                       />
                       <input
-                        className="border p-2 rounded"
+                        className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500"
                         placeholder="Panouri"
                         value={form.panels}
                         onChange={(e) => setForm({ ...form, panels: e.target.value })}
                       />
                       <input
-                        className="border p-2 rounded"
+                        className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500"
                         placeholder="Invertor"
                         value={form.inverter}
                         onChange={(e) => setForm({ ...form, inverter: e.target.value })}
                       />
                       <input
-                        className="border p-2 rounded"
+                        className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500"
                         placeholder="Baterie"
                         value={form.battery}
                         onChange={(e) => setForm({ ...form, battery: e.target.value })}
                       />
                       <select
-                        className="border p-2 rounded"
+                        className="border border-gray-300 p-3 rounded text-base text-gray-900"
                         value={form.status}
                         onChange={(e) => setForm({ ...form, status: e.target.value })}
                       >
@@ -471,7 +529,7 @@ export default function ProjectsPage() {
                         <option>Finalizat</option>
                       </select>
                       <textarea
-                        className="border p-2 rounded col-span-2"
+                        className="border border-gray-300 p-3 rounded col-span-1 sm:col-span-2 text-base text-gray-900 placeholder-gray-500"
                         placeholder="Observații"
                         rows={4}
                         value={form.notes}
@@ -480,53 +538,54 @@ export default function ProjectsPage() {
                     </>
                   ) : (
                     <>
-                      <div className="p-2">
-                        <p className="text-xs text-gray-400">Titlu proiect</p>
-                        <p className="font-medium">{form.title || "—"}</p>
+                      <div className="p-2 bg-gray-50 rounded">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Titlu proiect</p>
+                        <p className="font-semibold text-gray-900 text-base mt-1">{form.title || "—"}</p>
                       </div>
-                      <div className="p-2">
-                        <p className="text-xs text-gray-400">kW</p>
-                        <p className="font-medium">{form.kw || "—"}</p>
+                      <div className="p-2 bg-gray-50 rounded">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">kW</p>
+                        <p className="font-semibold text-gray-900 text-base mt-1">{form.kw || "—"}</p>
                       </div>
-                      <div className="p-2">
-                        <p className="text-xs text-gray-400">Panouri</p>
-                        <p className="font-medium">{form.panels || "—"}</p>
+                      <div className="p-2 bg-gray-50 rounded">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Panouri</p>
+                        <p className="font-semibold text-gray-900 text-base mt-1">{form.panels || "—"}</p>
                       </div>
-                      <div className="p-2">
-                        <p className="text-xs text-gray-400">Invertor</p>
-                        <p className="font-medium">{form.inverter || "—"}</p>
+                      <div className="p-2 bg-gray-50 rounded">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Invertor</p>
+                        <p className="font-semibold text-gray-900 text-base mt-1">{form.inverter || "—"}</p>
                       </div>
-                      <div className="p-2">
-                        <p className="text-xs text-gray-400">Baterie</p>
-                        <p className="font-medium">{form.battery || "—"}</p>
+                      <div className="p-2 bg-gray-50 rounded">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Baterie</p>
+                        <p className="font-semibold text-gray-900 text-base mt-1">{form.battery || "—"}</p>
                       </div>
-                      <div className="p-2">
-                        <p className="text-xs text-gray-400">Status</p>
-                        <p className="font-medium">{form.status || "—"}</p>
+                      <div className="p-2 bg-gray-50 rounded">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</p>
+                        <p className="font-semibold text-gray-900 text-base mt-1">{form.status || "—"}</p>
                       </div>
-                      <div className="p-2 col-span-2">
-                        <p className="text-xs text-gray-400">Observații</p>
-                        <p className="font-medium whitespace-pre-wrap">{form.notes || "—"}</p>
+                      <div className="p-2 bg-gray-50 rounded col-span-1 sm:col-span-2">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Observații</p>
+                        <p className="font-semibold text-gray-900 text-base mt-1 whitespace-pre-wrap">{form.notes || "—"}</p>
                       </div>
                     </>
                   )}
                 </div>
               )}
 
+              {/* Sectiune Poze Acoperis */}
               <button
-                className="w-full text-left font-bold bg-gray-100 p-3 rounded mt-3"
+                className="w-full text-left font-bold text-gray-900 bg-gray-100 p-3 rounded mt-3 text-base"
                 onClick={() => setShowRoof(!showRoof)}
               >
-                🏠 Poze Acoperiș
+                🏠 Poze Acoperiș {showRoof ? "▲" : "▼"}
               </button>
 
               {showRoof && (
-                <div className="p-2">
+                <div className="p-2 mt-1">
                   {isAdmin && (
                     <input
                       type="file"
                       accept="image/*"
-                      className="mb-3"
+                      className="mb-3 text-sm text-gray-700"
                       onChange={async (e) => {
                         const file = e.target.files?.[0];
                         if (!file) return;
@@ -545,27 +604,28 @@ export default function ProjectsPage() {
                           setActiveIndex(i);
                           setOpenLightbox(true);
                         }}
-                        className="rounded border h-32 w-full object-cover cursor-pointer"
+                        className="rounded border h-28 w-full object-cover cursor-pointer"
                       />
                     ))}
                   </div>
                 </div>
               )}
 
+              {/* Sectiune Simulare */}
               <button
-                className="w-full text-left font-bold bg-gray-100 p-3 rounded mt-3"
+                className="w-full text-left font-bold text-gray-900 bg-gray-100 p-3 rounded mt-3 text-base"
                 onClick={() => setShowSimulation(!showSimulation)}
               >
-                ☀️ Simulare Panouri
+                ☀️ Simulare Panouri {showSimulation ? "▲" : "▼"}
               </button>
 
               {showSimulation && (
-                <div className="p-2">
+                <div className="p-2 mt-1">
                   {isAdmin && (
                     <input
                       type="file"
                       accept="image/*"
-                      className="mb-3"
+                      className="mb-3 text-sm text-gray-700"
                       onChange={async (e) => {
                         const file = e.target.files?.[0];
                         if (!file) return;
@@ -584,16 +644,16 @@ export default function ProjectsPage() {
                           setActiveIndex(i);
                           setOpenLightbox(true);
                         }}
-                        className="rounded border h-32 w-full object-cover cursor-pointer"
+                        className="rounded border h-28 w-full object-cover cursor-pointer"
                       />
                     ))}
                   </div>
                 </div>
               )}
 
-              <div className="flex gap-2 mt-6">
+              <div className="flex flex-wrap gap-2 mt-6">
                 <button
-                  className="bg-gray-300 px-4 py-2 rounded"
+                  className="bg-gray-300 text-gray-800 font-semibold px-4 py-3 rounded text-base"
                   onClick={resetForm}
                 >
                   Închide
@@ -601,7 +661,7 @@ export default function ProjectsPage() {
 
                 {isAdmin && !selectedProject && (
                   <button
-                    className="bg-blue-600 text-white px-4 py-2 rounded"
+                    className="bg-blue-600 text-white font-semibold px-4 py-3 rounded text-base"
                     onClick={handleSave}
                   >
                     Salvează
@@ -611,13 +671,13 @@ export default function ProjectsPage() {
                 {isAdmin && selectedProject && (
                   <>
                     <button
-                      className="bg-blue-600 text-white px-4 py-2 rounded"
+                      className="bg-blue-600 text-white font-semibold px-4 py-3 rounded text-base"
                       onClick={handleUpdate}
                     >
                       Actualizează
                     </button>
                     <button
-                      className="bg-red-600 text-white px-4 py-2 rounded"
+                      className="bg-red-600 text-white font-semibold px-4 py-3 rounded text-base"
                       onClick={handleDelete}
                     >
                       Șterge

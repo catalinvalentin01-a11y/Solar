@@ -13,10 +13,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ro">
-     <body className="min-h-screen flex flex-col md:flex-row">
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+      </head>
+      <body className="min-h-screen flex flex-col md:flex-row">
 
         {/* SIDEBAR */}
-       <aside className="w-full md:w-64 bg-gray-900 text-white p-4 space-y-3">
+        <aside className="w-full md:w-64 bg-gray-900 text-white p-4 space-y-3">
           <h1 className="text-xl font-bold mb-4">☀️ Solar CRM</h1>
 
           <nav className="space-y-2">
@@ -35,7 +38,7 @@ export default function RootLayout({
         </aside>
 
         {/* CONTINUT */}
-        <main className="flex-1 bg-gray-50 p-6 overflow-auto">
+        <main className="flex-1 bg-gray-50 p-4 md:p-6 overflow-auto">
           {children}
         </main>
 
