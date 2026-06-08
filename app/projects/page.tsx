@@ -7,8 +7,19 @@ import interactionPlugin from "@fullcalendar/interaction";
 import AuthGuard from "@/components/AuthGuard";
 import { supabase } from "@/lib/supabase";
 import ImageLightbox from "@/components/ImageLightbox";
-
 const ADMIN_EMAIL = "catalinvalentin01@gmail.com";
+const [isAdmin, setIsAdmin] = useState(false);
+
+useEffect(() => {
+  const check = async () => {
+    const { data } = await supabase.auth.getUser();
+    const email = data.user?.email;
+
+    setIsAdmin(email === ADMIN_EMAIL);
+  };
+
+  check();
+}, []);
 
 type Project = {
   id?: string;
@@ -36,8 +47,18 @@ type Project = {
 
 export default function ProjectsPage() {
   const [events, setEvents] = useState<any[]>([]);
- const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+useEffect(() => {
+  const check = async () => {
+    const { data } = await supabase.auth.getUser();
+    const email = data.user?.email;
 
+    setIsAdmin(email === ADMIN_EMAIL);
+  };
+
+  check();
+}, []);
 useEffect(() => {
   console.log("OPEN =", open);
 }, [open]);
@@ -155,12 +176,13 @@ const [openLightbox, setOpenLightbox] = useState(false);
     return;
   }
 
-  const calendarEvents = (data || []).map((project) => ({
-    id: project.id,
-    title: `${project.client} - ${project.title}`,
-    date: project.date,
-    extendedProps: { ...project },
-  }));
+ const calendarEvents = (data || []).map((project) => ({
+  id: project.id,
+  title: `${project.client} - ${project.title}`,
+  start: project.date,   // IMPORTANT
+  allDay: true,          // 🔥 adaugă asta
+  extendedProps: project,
+})); 
 
   console.log("PROJECTS:", data);
   console.log("EVENTS:", calendarEvents);
@@ -361,53 +383,53 @@ await loadProjects();
 </p>
 
       <div className="overflow-x-auto">
-  <FullCalendar
   
+  
+  <FullCalendar
   plugins={[dayGridPlugin, interactionPlugin]}
   initialView="dayGridMonth"
   height="auto"
-        dateClick={(info) => {
+  events={events}
 
+  dateClick={(info) => {
+    setSelectedProject(null);
+    setSelectedDate(info.dateStr);
+    setOpen(true);
+  }}
 
-          setSelectedProject(null);
-          setSelectedDate(info.dateStr);
-          setOpen(true);
-        }}
-        eventClick={(info) => {
-          const p = info.event.extendedProps as Project;
+  eventClick={(info) => {
+    const p = info.event.extendedProps as Project;
 
-          setSelectedProject({
-            ...p,
-            id: info.event.id,
-          });
+    setSelectedProject({
+      ...p,
+      id: info.event.id,
+    });
 
-          setSelectedDate(p.date || null);
+    setSelectedDate(p.date || null);
 
-          setForm({
-            client: p.client || "",
-            phone: p.phone || "",
-            email: p.email || "",
+    setForm({
+      client: p.client || "",
+      phone: p.phone || "",
+      email: p.email || "",
 
-            title: p.title || "",
-            location: p.location || "",
+      title: p.title || "",
+      location: p.location || "",
 
-            kw: p.kw || "",
-            battery: p.battery || "",
-            panels: p.panels || "",
-            inverter: p.inverter || "",
+      kw: p.kw || "",
+      battery: p.battery || "",
+      panels: p.panels || "",
+      inverter: p.inverter || "",
 
-            notes: p.notes || "",
-            status: p.status || "Programat",
+      notes: p.notes || "",
+      status: p.status || "Programat",
 
-            roof_images: p.roof_images || [],
-            simulation_images:
-              p.simulation_images || [],
-          });
+      roof_images: p.roof_images || [],
+      simulation_images: p.simulation_images || [],
+    });
 
-          setOpen(true);
-        }}
-
-      />
+    setOpen(true);
+  }}
+/>
       </div>
 
       {open && (
