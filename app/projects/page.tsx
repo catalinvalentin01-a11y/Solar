@@ -7,41 +7,24 @@ import interactionPlugin from "@fullcalendar/interaction";
 import AuthGuard from "@/components/AuthGuard";
 import { supabase } from "@/lib/supabase";
 import ImageLightbox from "@/components/ImageLightbox";
+
 const ADMIN_EMAIL = "catalinvalentin01@gmail.com";
-const [isAdmin, setIsAdmin] = useState(false);
-
-useEffect(() => {
-  const check = async () => {
-    const { data } = await supabase.auth.getUser();
-    const email = data.user?.email;
-
-    setIsAdmin(email === ADMIN_EMAIL);
-  };
-
-  check();
-}, []);
 
 type Project = {
   id?: string;
-
   client: string;
   phone: string;
   email: string;
-
   title: string;
   location: string;
-
   kw: string;
   battery: string;
   panels: string;
   inverter: string;
-
   notes: string;
   status: string;
-
   roof_images: string[];
   simulation_images: string[];
-
   date?: string;
 };
 
@@ -49,147 +32,69 @@ export default function ProjectsPage() {
   const [events, setEvents] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
-useEffect(() => {
-  const check = async () => {
-    const { data } = await supabase.auth.getUser();
-    const email = data.user?.email;
 
-    setIsAdmin(email === ADMIN_EMAIL);
-  };
-
-  check();
-}, []);
-useEffect(() => {
-  console.log("OPEN =", open);
-}, [open]);
-useEffect(() => {
-  setOpen(false);
-}, []);
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
-const [activeIndex, setActiveIndex] = useState(0);
-const [openLightbox, setOpenLightbox] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [openLightbox, setOpenLightbox] = useState(false);
 
-
-
-  const [selectedDate, setSelectedDate] =
-    useState<string | null>(null);
-    const [previewImage, setPreviewImage] = useState<string | null>(null);
-
-  const [selectedProject, setSelectedProject] =
-    useState<Project | null>(null);
-
-  
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
   const [showClient, setShowClient] = useState(true);
   const [showTechnical, setShowTechnical] = useState(true);
   const [showRoof, setShowRoof] = useState(true);
-  const [showSimulation, setShowSimulation] =
-    useState(true);
-  const deleteImage = async (imgToDelete: string, type: "roof" | "simulation") => {
-  setForm((prev) => {
-    const updated =
-      type === "roof"
-        ? prev.roof_images.filter((img) => img !== imgToDelete)
-        : prev.simulation_images.filter((img) => img !== imgToDelete);
-
-    const newForm = {
-      ...prev,
-      roof_images: type === "roof" ? updated : prev.roof_images,
-      simulation_images: type === "simulation" ? updated : prev.simulation_images,
-    };
-
-    // 🔥 update DB
-    if (selectedProject?.id) {
-      supabase
-        .from("projects")
-        .update({
-          roof_images: newForm.roof_images,
-          simulation_images: newForm.simulation_images,
-        })
-        .eq("id", selectedProject.id);
-    }
-
-    return newForm;
-  });
-
-  // 🔥 IMPORTANT: FORȚEAZĂ LIGHTBOX UPDATE
-  setLightboxImages((prev) => {
-    const filtered = prev.filter((img) => img !== imgToDelete);
-
-    // dacă nu mai sunt imagini → închide lightbox
-    if (filtered.length === 0) {
-      setOpenLightbox(false);
-      return [];
-    }
-
-    return filtered;
-  });
-};
+  const [showSimulation, setShowSimulation] = useState(true);
 
   const [form, setForm] = useState<Project>({
     client: "",
     phone: "",
     email: "",
-
     title: "",
     location: "",
-
     kw: "",
     battery: "",
     panels: "",
     inverter: "",
-
     notes: "",
     status: "Programat",
-
     roof_images: [],
     simulation_images: [],
   });
 
-  // ================= ADMIN =================
+  // ================= ADMIN CHECK =================
 
   useEffect(() => {
-  const checkUser = async () => {
-    const { data } = await supabase.auth.getUser();
-
-    const email = data.user?.email;
-
-    console.log("USER:", data.user);
-    console.log("EMAIL:", email);
-
-   
-  };
-
-  checkUser();
-}, []);
+    const check = async () => {
+      const { data } = await supabase.auth.getUser();
+      const email = data.user?.email;
+      setIsAdmin(email === ADMIN_EMAIL);
+    };
+    check();
+  }, []);
 
   // ================= LOAD =================
 
   async function loadProjects() {
-  const { data, error } = await supabase
-    .from("projects")
-    .select("*")
-    .order("date", { ascending: true });
+    const { data, error } = await supabase
+      .from("projects")
+      .select("*")
+      .order("date", { ascending: true });
 
-  if (error) {
-    console.error(error);
-    return;
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    const calendarEvents = (data || []).map((project) => ({
+      id: project.id,
+      title: `${project.client} - ${project.title}`,
+      start: project.date,
+      allDay: true,
+      extendedProps: project,
+    }));
+
+    setEvents([...calendarEvents]);
   }
-
- const calendarEvents = (data || []).map((project) => ({
-  id: project.id,
-  title: `${project.client} - ${project.title}`,
-  start: project.date,   // IMPORTANT
-  allDay: true,          // 🔥 adaugă asta
-  extendedProps: project,
-})); 
-
-  console.log("PROJECTS:", data);
-  console.log("EVENTS:", calendarEvents);
-
-  // 🔥 IMPORTANT FIX: forțează re-render nou
-  setEvents([...calendarEvents]);
-}
 
   useEffect(() => {
     loadProjects();
@@ -202,22 +107,17 @@ const [openLightbox, setOpenLightbox] = useState(false);
       client: "",
       phone: "",
       email: "",
-
       title: "",
       location: "",
-
       kw: "",
       battery: "",
       panels: "",
       inverter: "",
-
       notes: "",
       status: "Programat",
-
       roof_images: [],
       simulation_images: [],
     });
-
     setSelectedProject(null);
     setSelectedDate(null);
     setOpen(false);
@@ -226,27 +126,19 @@ const [openLightbox, setOpenLightbox] = useState(false);
   // ================= CREATE =================
 
   const handleSave = async () => {
-  console.log("FORM", form);
+    const { error } = await supabase
+      .from("projects")
+      .insert({ ...form, date: selectedDate })
+      .select();
 
-  const { data, error } = await supabase
-    .from("projects")
-    .insert({
-      ...form,
-      date: selectedDate,
-    })
-    .select();
+    if (error) {
+      alert(error.message);
+      return;
+    }
 
-  console.log("DATA", data);
-  console.log("ERROR", error);
-
-  if (error) {
-    alert(error.message);
-    return;
-  }
-
-  resetForm();
-await loadProjects();
-};
+    resetForm();
+    await loadProjects();
+  };
 
   // ================= UPDATE =================
 
@@ -259,18 +151,14 @@ await loadProjects();
         client: form.client,
         phone: form.phone,
         email: form.email,
-
         title: form.title,
         location: form.location,
-
         kw: form.kw,
         battery: form.battery,
         panels: form.panels,
         inverter: form.inverter,
-
         notes: form.notes,
         status: form.status,
-
         roof_images: form.roof_images,
         simulation_images: form.simulation_images,
       })
@@ -290,10 +178,7 @@ await loadProjects();
   const handleDelete = async () => {
     if (!selectedProject?.id) return;
 
-    const ok = confirm(
-      "Sigur dorești ștergerea proiectului?"
-    );
-
+    const ok = confirm("Sigur dorești ștergerea proiectului?");
     if (!ok) return;
 
     const { error } = await supabase
@@ -310,14 +195,49 @@ await loadProjects();
     resetForm();
   };
 
+  // ================= DELETE IMAGE =================
+
+  const deleteImage = async (imgToDelete: string, type: "roof" | "simulation") => {
+    setForm((prev) => {
+      const newForm = {
+        ...prev,
+        roof_images:
+          type === "roof"
+            ? prev.roof_images.filter((img) => img !== imgToDelete)
+            : prev.roof_images,
+        simulation_images:
+          type === "simulation"
+            ? prev.simulation_images.filter((img) => img !== imgToDelete)
+            : prev.simulation_images,
+      };
+
+      if (selectedProject?.id) {
+        supabase
+          .from("projects")
+          .update({
+            roof_images: newForm.roof_images,
+            simulation_images: newForm.simulation_images,
+          })
+          .eq("id", selectedProject.id);
+      }
+
+      return newForm;
+    });
+
+    setLightboxImages((prev) => {
+      const filtered = prev.filter((img) => img !== imgToDelete);
+      if (filtered.length === 0) {
+        setOpenLightbox(false);
+        return [];
+      }
+      return filtered;
+    });
+  };
+
   // ================= UPLOAD =================
 
-  const uploadImage = async (
-    file: File,
-    target: "roof" | "simulation"
-  ) => {
-    const fileName =
-      Date.now() + "-" + file.name;
+  const uploadImage = async (file: File, target: "roof" | "simulation") => {
+    const fileName = Date.now() + "-" + file.name;
 
     const { error } = await supabase.storage
       .from("project-images")
@@ -327,24 +247,6 @@ await loadProjects();
       console.error(error);
       return;
     }
-    
-    const deleteImage = (
-  imgToDelete: string,
-  type: "roof" | "simulation"
-) => {
-  setForm((prev) => {
-    const updated =
-      type === "roof"
-        ? prev.roof_images.filter((img) => img !== imgToDelete)
-        : prev.simulation_images.filter((img) => img !== imgToDelete);
-
-    return {
-      ...prev,
-      [type === "roof" ? "roof_images" : "simulation_images"]:
-        updated,
-    };
-  });
-};
 
     const { data } = supabase.storage
       .from("project-images")
@@ -355,445 +257,409 @@ await loadProjects();
     if (target === "roof") {
       setForm((prev) => ({
         ...prev,
-        roof_images: [
-          ...prev.roof_images,
-          url,
-        ],
+        roof_images: [...prev.roof_images, url],
       }));
     }
 
     if (target === "simulation") {
       setForm((prev) => ({
         ...prev,
-        simulation_images: [
-          ...prev.simulation_images,
-          url,
-        ],
+        simulation_images: [...prev.simulation_images, url],
       }));
     }
   };
-    return (
-        <AuthGuard>
-    <div className="p-2 md:p-6">
-      <h1 className="text-2xl font-bold mb-4 text-red-600">
-  TEST 123456
-</h1>
-   <p className="text-red-500">
- 
-</p>
 
-      <div className="overflow-x-auto">
-  
-  
-  <FullCalendar
-  plugins={[dayGridPlugin, interactionPlugin]}
-  initialView="dayGridMonth"
-  height="auto"
-  events={events}
+  // ================= HELPERS =================
 
-  dateClick={(info) => {
-    setSelectedProject(null);
-    setSelectedDate(info.dateStr);
-    setOpen(true);
-  }}
+  const handleCall = (phone: string) => {
+    if (!phone) return;
+    window.location.href = `tel:${phone}`;
+  };
 
-  eventClick={(info) => {
-    const p = info.event.extendedProps as Project;
+  const handleMaps = (location: string) => {
+    if (!location) return;
+    const query = encodeURIComponent(location);
+    window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, "_blank");
+  };
 
-    setSelectedProject({
-      ...p,
-      id: info.event.id,
-    });
+  // ================= RENDER =================
 
-    setSelectedDate(p.date || null);
+  return (
+    <AuthGuard>
+      <div className="p-2 md:p-6">
 
-    setForm({
-      client: p.client || "",
-      phone: p.phone || "",
-      email: p.email || "",
-
-      title: p.title || "",
-      location: p.location || "",
-
-      kw: p.kw || "",
-      battery: p.battery || "",
-      panels: p.panels || "",
-      inverter: p.inverter || "",
-
-      notes: p.notes || "",
-      status: p.status || "Programat",
-
-      roof_images: p.roof_images || [],
-      simulation_images: p.simulation_images || [],
-    });
-
-    setOpen(true);
-  }}
-/>
-      </div>
-
-      {open && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center">
-          <div
-            className="fixed inset-0 bg-black/60"
-            onClick={() => setOpen(false)}
+        {/* CALENDAR */}
+        <div className="overflow-x-auto">
+          <FullCalendar
+            plugins={[dayGridPlugin, interactionPlugin]}
+            initialView="dayGridMonth"
+            height="auto"
+            events={events}
+            dateClick={(info) => {
+              // Doar adminul poate crea proiecte noi
+              if (!isAdmin) return;
+              setSelectedProject(null);
+              setSelectedDate(info.dateStr);
+              setOpen(true);
+            }}
+            eventClick={(info) => {
+              const p = info.event.extendedProps as Project;
+              setSelectedProject({ ...p, id: info.event.id });
+              setSelectedDate(p.date || null);
+              setForm({
+                client: p.client || "",
+                phone: p.phone || "",
+                email: p.email || "",
+                title: p.title || "",
+                location: p.location || "",
+                kw: p.kw || "",
+                battery: p.battery || "",
+                panels: p.panels || "",
+                inverter: p.inverter || "",
+                notes: p.notes || "",
+                status: p.status || "Programat",
+                roof_images: p.roof_images || [],
+                simulation_images: p.simulation_images || [],
+              });
+              setOpen(true);
+            }}
           />
+        </div>
 
-          <div className="relative bg-white rounded-lg p-4 w-[95vw] md:w-[900px] max-h-[90vh] overflow-y-auto z-[10000]">
+        {/* MODAL */}
+        {open && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+            <div
+              className="fixed inset-0 bg-black/60"
+              onClick={() => setOpen(false)}
+            />
 
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="font-bold text-xl">
-                {selectedProject
-                  ? "Detalii proiect"
-                  : "Proiect nou"}
-              </h2>
+            <div className="relative bg-white rounded-lg p-4 w-[95vw] md:w-[900px] max-h-[90vh] overflow-y-auto z-[10000]">
 
-              <span className="text-sm text-gray-500">
-                {selectedDate}
-              </span>
-            </div>
-
-            {/* DATE CLIENT */}
-
-            <button
-              className="w-full text-left font-bold bg-gray-100 p-3 rounded"
-              onClick={() =>
-                setShowClient(!showClient)
-              }
-            >
-              📋 Date Client
-            </button>
-
-            {showClient && (
-              <div className="grid grid-cols-2 gap-2 p-2">
-
-                <input
- 
-                  className="border p-2"
-                  placeholder="Client"
-                  value={form.client}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      client: e.target.value,
-                    })
-                  }
-                />
-
-                <input
-
-                  className="border p-2"
-                  placeholder="Telefon"
-                  value={form.phone}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      phone: e.target.value,
-                    })
-                  }
-                />
-
-                <input
-   
-                  className="border p-2"
-                  placeholder="Email"
-                  value={form.email}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      email: e.target.value,
-                    })
-                  }
-                />
-
-                <input
-   
-                  className="border p-2"
-                  placeholder="Locație"
-                  value={form.location}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      location: e.target.value,
-                    })
-                  }
-                />
+              {/* HEADER */}
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="font-bold text-xl">
+                  {selectedProject ? "Detalii proiect" : "Proiect nou"}
+                </h2>
+                <span className="text-sm text-gray-500">{selectedDate}</span>
               </div>
-            )}
 
-            {/* DATE TEHNICE */}
-
-            <button
-              className="w-full text-left font-bold bg-gray-100 p-3 rounded mt-3"
-              onClick={() =>
-                setShowTechnical(!showTechnical)
-              }
-            >
-              ⚡ Date Tehnice
-            </button>
-
-            {showTechnical && (
-              <div className="grid grid-cols-2 gap-2 p-2">
-
-                <input
-  
-                  className="border p-2"
-                  placeholder="Titlu proiect"
-                  value={form.title}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      title: e.target.value,
-                    })
-                  }
-                />
-
-                <input
-    
-                  className="border p-2"
-                  placeholder="kW"
-                  value={form.kw}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      kw: e.target.value,
-                    })
-                  }
-                />
-
-                <input
-        
-                  className="border p-2"
-                  placeholder="Panouri"
-                  value={form.panels}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      panels: e.target.value,
-                    })
-                  }
-                />
-
-                <input
-   
-                  className="border p-2"
-                  placeholder="Invertor"
-                  value={form.inverter}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      inverter: e.target.value,
-                    })
-                  }
-                />
-
-                <input
-        
-                  className="border p-2"
-                  placeholder="Baterie"
-                  value={form.battery}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      battery: e.target.value,
-                    })
-                  }
-                />
-
-                <select
-           
-                  className="border p-2"
-                  value={form.status}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      status: e.target.value,
-                    })
-                  }
-                >
-                  <option>Programat</option>
-                  <option>În lucru</option>
-                  <option>Finalizat</option>
-                </select>
-
-                <textarea
-             
-                  className="border p-2 col-span-2"
-                  placeholder="Observații"
-                  rows={4}
-                  value={form.notes}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      notes: e.target.value,
-                    })
-                  }
-                />
-              </div>
-            )}
-
-            {/* POZE ACOPERIS */}
-
-            <button
-              className="w-full text-left font-bold bg-gray-100 p-3 rounded mt-3"
-              onClick={() =>
-                setShowRoof(!showRoof)
-              }
-            >
-              🏠 Poze Acoperiș
-            </button>
-
-            {showRoof && (
-              <div className="p-2">
-
-                
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="mb-3"
-                    onChange={async (e) => {
-                      const file =
-                        e.target.files?.[0];
-
-                      if (!file) return;
-
-                      await uploadImage(
-                        file,
-                        "roof"
-                      );
-                    }}
-                  />
-                
-
-                <div className="grid grid-cols-3 gap-2">
-      {form.roof_images.map((img, i) => (
-  <img
-    key={img}
-    src={img}
-    alt=""
-   onClick={() => {
-  setLightboxImages(form.roof_images || []);
-  setActiveIndex(i);
-  setOpenLightbox(true);
-}}
-    className="rounded border h-32 w-full object-cover cursor-pointer"
-  />
-))}
+              {/* BUTOANE RAPIDE: SUNĂ + GPS — vizibile pentru toți, când există proiect */}
+              {selectedProject && (
+                <div className="flex gap-3 mb-4">
+                  {form.phone && (
+                    <a
+                      href={`tel:${form.phone}`}
+                      className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition"
+                    >
+                      📞 Sună — {form.phone}
+                    </a>
+                  )}
+                  {form.location && (
+                    <button
+                      className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition"
+                      onClick={() => handleMaps(form.location)}
+                    >
+                      📍 GPS — {form.location}
+                    </button>
+                  )}
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* SIMULARE */}
-
-            <button
-              className="w-full text-left font-bold bg-gray-100 p-3 rounded mt-3"
-              onClick={() =>
-                setShowSimulation(
-                  !showSimulation
-                )
-              }
-            >
-              ☀️ Simulare Panouri
-            </button>
-
-            {showSimulation && (
-              <div className="p-2">
-
-                
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="mb-3"
-                    onChange={async (e) => {
-                      const file =
-                        e.target.files?.[0];
-
-                      if (!file) return;
-
-                      await uploadImage(
-                        file,
-                        "simulation"
-                      );
-                    }}
-                  />
-                
-
-                <div className="grid grid-cols-3 gap-2">
-                 {form.simulation_images.map((img, i) => (
-  <img
-    key={img}
-    src={img}
-    alt=""
-    onClick={() => {
-      setLightboxImages(form.simulation_images || []);
-      setActiveIndex(i);
-      setOpenLightbox(true);
-    }}
-    className="rounded border h-32 w-full object-cover cursor-pointer"
-  />
-))}
-                </div>
-              </div>
-            )}
-
-            {/* BUTTONS */}
-
-            <div className="flex gap-2 mt-6">
-
+              {/* ===== DATE CLIENT ===== */}
               <button
-                className="bg-gray-300 px-4 py-2 rounded"
-                onClick={resetForm}
+                className="w-full text-left font-bold bg-gray-100 p-3 rounded"
+                onClick={() => setShowClient(!showClient)}
               >
-                Închide
+                📋 Date Client
               </button>
 
-              
-                <button
-                  className="bg-blue-600 text-white px-4 py-2 rounded"
-                  onClick={handleSave}
-                >
-                  Salvează
-                </button>
-              
+              {showClient && (
+                <div className="grid grid-cols-2 gap-2 p-2">
+                  {isAdmin ? (
+                    <>
+                      <input
+                        className="border p-2 rounded"
+                        placeholder="Client"
+                        value={form.client}
+                        onChange={(e) => setForm({ ...form, client: e.target.value })}
+                      />
+                      <input
+                        className="border p-2 rounded"
+                        placeholder="Telefon"
+                        value={form.phone}
+                        onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                      />
+                      <input
+                        className="border p-2 rounded"
+                        placeholder="Email"
+                        value={form.email}
+                        onChange={(e) => setForm({ ...form, email: e.target.value })}
+                      />
+                      <input
+                        className="border p-2 rounded"
+                        placeholder="Locație"
+                        value={form.location}
+                        onChange={(e) => setForm({ ...form, location: e.target.value })}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <div className="p-2">
+                        <p className="text-xs text-gray-400">Client</p>
+                        <p className="font-medium">{form.client || "—"}</p>
+                      </div>
+                      <div className="p-2">
+                        <p className="text-xs text-gray-400">Telefon</p>
+                        <p className="font-medium">{form.phone || "—"}</p>
+                      </div>
+                      <div className="p-2">
+                        <p className="text-xs text-gray-400">Email</p>
+                        <p className="font-medium">{form.email || "—"}</p>
+                      </div>
+                      <div className="p-2">
+                        <p className="text-xs text-gray-400">Locație</p>
+                        <p className="font-medium">{form.location || "—"}</p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
 
-             
-                <>
+              {/* ===== DATE TEHNICE ===== */}
+              <button
+                className="w-full text-left font-bold bg-gray-100 p-3 rounded mt-3"
+                onClick={() => setShowTechnical(!showTechnical)}
+              >
+                ⚡ Date Tehnice
+              </button>
+
+              {showTechnical && (
+                <div className="grid grid-cols-2 gap-2 p-2">
+                  {isAdmin ? (
+                    <>
+                      <input
+                        className="border p-2 rounded"
+                        placeholder="Titlu proiect"
+                        value={form.title}
+                        onChange={(e) => setForm({ ...form, title: e.target.value })}
+                      />
+                      <input
+                        className="border p-2 rounded"
+                        placeholder="kW"
+                        value={form.kw}
+                        onChange={(e) => setForm({ ...form, kw: e.target.value })}
+                      />
+                      <input
+                        className="border p-2 rounded"
+                        placeholder="Panouri"
+                        value={form.panels}
+                        onChange={(e) => setForm({ ...form, panels: e.target.value })}
+                      />
+                      <input
+                        className="border p-2 rounded"
+                        placeholder="Invertor"
+                        value={form.inverter}
+                        onChange={(e) => setForm({ ...form, inverter: e.target.value })}
+                      />
+                      <input
+                        className="border p-2 rounded"
+                        placeholder="Baterie"
+                        value={form.battery}
+                        onChange={(e) => setForm({ ...form, battery: e.target.value })}
+                      />
+                      <select
+                        className="border p-2 rounded"
+                        value={form.status}
+                        onChange={(e) => setForm({ ...form, status: e.target.value })}
+                      >
+                        <option>Programat</option>
+                        <option>În lucru</option>
+                        <option>Finalizat</option>
+                      </select>
+                      <textarea
+                        className="border p-2 rounded col-span-2"
+                        placeholder="Observații"
+                        rows={4}
+                        value={form.notes}
+                        onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <div className="p-2">
+                        <p className="text-xs text-gray-400">Titlu proiect</p>
+                        <p className="font-medium">{form.title || "—"}</p>
+                      </div>
+                      <div className="p-2">
+                        <p className="text-xs text-gray-400">kW</p>
+                        <p className="font-medium">{form.kw || "—"}</p>
+                      </div>
+                      <div className="p-2">
+                        <p className="text-xs text-gray-400">Panouri</p>
+                        <p className="font-medium">{form.panels || "—"}</p>
+                      </div>
+                      <div className="p-2">
+                        <p className="text-xs text-gray-400">Invertor</p>
+                        <p className="font-medium">{form.inverter || "—"}</p>
+                      </div>
+                      <div className="p-2">
+                        <p className="text-xs text-gray-400">Baterie</p>
+                        <p className="font-medium">{form.battery || "—"}</p>
+                      </div>
+                      <div className="p-2">
+                        <p className="text-xs text-gray-400">Status</p>
+                        <p className="font-medium">{form.status || "—"}</p>
+                      </div>
+                      <div className="p-2 col-span-2">
+                        <p className="text-xs text-gray-400">Observații</p>
+                        <p className="font-medium whitespace-pre-wrap">{form.notes || "—"}</p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* ===== POZE ACOPERIS ===== */}
+              <button
+                className="w-full text-left font-bold bg-gray-100 p-3 rounded mt-3"
+                onClick={() => setShowRoof(!showRoof)}
+              >
+                🏠 Poze Acoperiș
+              </button>
+
+              {showRoof && (
+                <div className="p-2">
+                  {isAdmin && (
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="mb-3"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        await uploadImage(file, "roof");
+                      }}
+                    />
+                  )}
+                  <div className="grid grid-cols-3 gap-2">
+                    {form.roof_images.map((img, i) => (
+                      <img
+                        key={img}
+                        src={img}
+                        alt=""
+                        onClick={() => {
+                          setLightboxImages(form.roof_images || []);
+                          setActiveIndex(i);
+                          setOpenLightbox(true);
+                        }}
+                        className="rounded border h-32 w-full object-cover cursor-pointer"
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ===== SIMULARE ===== */}
+              <button
+                className="w-full text-left font-bold bg-gray-100 p-3 rounded mt-3"
+                onClick={() => setShowSimulation(!showSimulation)}
+              >
+                ☀️ Simulare Panouri
+              </button>
+
+              {showSimulation && (
+                <div className="p-2">
+                  {isAdmin && (
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="mb-3"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        await uploadImage(file, "simulation");
+                      }}
+                    />
+                  )}
+                  <div className="grid grid-cols-3 gap-2">
+                    {form.simulation_images.map((img, i) => (
+                      <img
+                        key={img}
+                        src={img}
+                        alt=""
+                        onClick={() => {
+                          setLightboxImages(form.simulation_images || []);
+                          setActiveIndex(i);
+                          setOpenLightbox(true);
+                        }}
+                        className="rounded border h-32 w-full object-cover cursor-pointer"
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ===== BUTOANE ADMIN ===== */}
+              <div className="flex gap-2 mt-6">
+                <button
+                  className="bg-gray-300 px-4 py-2 rounded"
+                  onClick={resetForm}
+                >
+                  Închide
+                </button>
+
+                {isAdmin && !selectedProject && (
                   <button
                     className="bg-blue-600 text-white px-4 py-2 rounded"
-                    onClick={handleUpdate}
+                    onClick={handleSave}
                   >
-                    Actualizează
+                    Salvează
                   </button>
+                )}
 
-                  <button
-                    className="bg-red-600 text-white px-4 py-2 rounded"
-                    onClick={handleDelete}
-                  >
-                    Șterge
-                  </button>
-                </>
-              
+                {isAdmin && selectedProject && (
+                  <>
+                    <button
+                      className="bg-blue-600 text-white px-4 py-2 rounded"
+                      onClick={handleUpdate}
+                    >
+                      Actualizează
+                    </button>
+                    <button
+                      className="bg-red-600 text-white px-4 py-2 rounded"
+                      onClick={handleDelete}
+                    >
+                      Șterge
+                    </button>
+                  </>
+                )}
+              </div>
 
             </div>
-
           </div>
-        </div>
-      )}
-  {openLightbox && (
-  <ImageLightbox
-    images={lightboxImages}
-    initialIndex={activeIndex}
-    onClose={() => setOpenLightbox(false)}
-    onDelete={(img) => {
-      deleteImage(
-        img,
-        // alegem din ce galerie vine
-        form.roof_images.includes(img) ? "roof" : "simulation"
-      );
-    }}
-  />
-)}
-    </div>
-</AuthGuard>
-    
-    )}
+        )}
+
+        {/* LIGHTBOX */}
+        {openLightbox && (
+          <ImageLightbox
+            images={lightboxImages}
+            initialIndex={activeIndex}
+            onClose={() => setOpenLightbox(false)}
+            onDelete={
+              isAdmin
+                ? (img) => {
+                    deleteImage(
+                      img,
+                      form.roof_images.includes(img) ? "roof" : "simulation"
+                    );
+                  }
+                : undefined
+            }
+          />
+        )}
+
+      </div>
+    </AuthGuard>
+  );
+}
