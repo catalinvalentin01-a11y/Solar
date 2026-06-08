@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
+import roLocale from "@fullcalendar/core/locales/ro";
 import AuthGuard from "@/components/AuthGuard";
 import { supabase } from "@/lib/supabase";
 import ImageLightbox from "@/components/ImageLightbox";
@@ -61,8 +62,6 @@ export default function ProjectsPage() {
     simulation_images: [],
   });
 
-  // ================= ADMIN CHECK =================
-
   useEffect(() => {
     const check = async () => {
       const { data } = await supabase.auth.getUser();
@@ -71,8 +70,6 @@ export default function ProjectsPage() {
     };
     check();
   }, []);
-
-  // ================= LOAD =================
 
   async function loadProjects() {
     const { data, error } = await supabase
@@ -100,8 +97,6 @@ export default function ProjectsPage() {
     loadProjects();
   }, []);
 
-  // ================= RESET =================
-
   const resetForm = () => {
     setForm({
       client: "",
@@ -123,8 +118,6 @@ export default function ProjectsPage() {
     setOpen(false);
   };
 
-  // ================= CREATE =================
-
   const handleSave = async () => {
     const { error } = await supabase
       .from("projects")
@@ -139,8 +132,6 @@ export default function ProjectsPage() {
     resetForm();
     await loadProjects();
   };
-
-  // ================= UPDATE =================
 
   const handleUpdate = async () => {
     if (!selectedProject?.id) return;
@@ -173,8 +164,6 @@ export default function ProjectsPage() {
     resetForm();
   };
 
-  // ================= DELETE =================
-
   const handleDelete = async () => {
     if (!selectedProject?.id) return;
 
@@ -194,8 +183,6 @@ export default function ProjectsPage() {
     await loadProjects();
     resetForm();
   };
-
-  // ================= DELETE IMAGE =================
 
   const deleteImage = async (imgToDelete: string, type: "roof" | "simulation") => {
     setForm((prev) => {
@@ -234,8 +221,6 @@ export default function ProjectsPage() {
     });
   };
 
-  // ================= UPLOAD =================
-
   const uploadImage = async (file: File, target: "roof" | "simulation") => {
     const fileName = Date.now() + "-" + file.name;
 
@@ -269,8 +254,6 @@ export default function ProjectsPage() {
     }
   };
 
-  // ================= HELPERS =================
-
   const handleCall = (phone: string) => {
     if (!phone) return;
     window.location.href = `tel:${phone}`;
@@ -282,21 +265,36 @@ export default function ProjectsPage() {
     window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, "_blank");
   };
 
-  // ================= RENDER =================
-
   return (
     <AuthGuard>
       <div className="p-2 md:p-6">
 
-        {/* CALENDAR */}
+        <style>{`
+          .fc {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
+          }
+          .fc table {
+            border-collapse: collapse;
+          }
+          .fc td, .fc th {
+            border-width: 1px !important;
+          }
+          .fc .fc-scrollgrid {
+            transform: translateZ(0);
+            backface-visibility: hidden;
+          }
+        `}</style>
+
         <div className="overflow-x-auto">
           <FullCalendar
             plugins={[dayGridPlugin, interactionPlugin]}
             initialView="dayGridMonth"
             height="auto"
+            locale={roLocale}
             events={events}
             dateClick={(info) => {
-              // Doar adminul poate crea proiecte noi
               if (!isAdmin) return;
               setSelectedProject(null);
               setSelectedDate(info.dateStr);
@@ -326,7 +324,6 @@ export default function ProjectsPage() {
           />
         </div>
 
-        {/* MODAL */}
         {open && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center">
             <div
@@ -336,7 +333,6 @@ export default function ProjectsPage() {
 
             <div className="relative bg-white rounded-lg p-4 w-[95vw] md:w-[900px] max-h-[90vh] overflow-y-auto z-[10000]">
 
-              {/* HEADER */}
               <div className="flex justify-between items-center mb-4">
                 <h2 className="font-bold text-xl">
                   {selectedProject ? "Detalii proiect" : "Proiect nou"}
@@ -344,16 +340,15 @@ export default function ProjectsPage() {
                 <span className="text-sm text-gray-500">{selectedDate}</span>
               </div>
 
-              {/* BUTOANE RAPIDE: SUNĂ + GPS — vizibile pentru toți, când există proiect */}
               {selectedProject && (
                 <div className="flex gap-3 mb-4">
                   {form.phone && (
-                    <a
-                      href={`tel:${form.phone}`}
+                    <button
                       className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition"
+                      onClick={() => handleCall(form.phone)}
                     >
                       📞 Sună — {form.phone}
-                    </a>
+                    </button>
                   )}
                   {form.location && (
                     <button
@@ -366,7 +361,6 @@ export default function ProjectsPage() {
                 </div>
               )}
 
-              {/* ===== DATE CLIENT ===== */}
               <button
                 className="w-full text-left font-bold bg-gray-100 p-3 rounded"
                 onClick={() => setShowClient(!showClient)}
@@ -426,7 +420,6 @@ export default function ProjectsPage() {
                 </div>
               )}
 
-              {/* ===== DATE TEHNICE ===== */}
               <button
                 className="w-full text-left font-bold bg-gray-100 p-3 rounded mt-3"
                 onClick={() => setShowTechnical(!showTechnical)}
@@ -520,7 +513,6 @@ export default function ProjectsPage() {
                 </div>
               )}
 
-              {/* ===== POZE ACOPERIS ===== */}
               <button
                 className="w-full text-left font-bold bg-gray-100 p-3 rounded mt-3"
                 onClick={() => setShowRoof(!showRoof)}
@@ -560,7 +552,6 @@ export default function ProjectsPage() {
                 </div>
               )}
 
-              {/* ===== SIMULARE ===== */}
               <button
                 className="w-full text-left font-bold bg-gray-100 p-3 rounded mt-3"
                 onClick={() => setShowSimulation(!showSimulation)}
@@ -600,7 +591,6 @@ export default function ProjectsPage() {
                 </div>
               )}
 
-              {/* ===== BUTOANE ADMIN ===== */}
               <div className="flex gap-2 mt-6">
                 <button
                   className="bg-gray-300 px-4 py-2 rounded"
@@ -640,7 +630,6 @@ export default function ProjectsPage() {
           </div>
         )}
 
-        {/* LIGHTBOX */}
         {openLightbox && (
           <ImageLightbox
             images={lightboxImages}
