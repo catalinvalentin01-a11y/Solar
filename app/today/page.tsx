@@ -26,11 +26,9 @@ export default function TodayPage() {
   const [selected, setSelected] = useState<Project | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
 
-  // 🔥 FIX ZONE (timezone safe)
   const todayStr = new Date().toLocaleDateString("en-CA");
   const tomorrowStr = new Date(Date.now() + 86400000).toLocaleDateString("en-CA");
 
-  // ================= LOAD PROJECTS =================
   useEffect(() => {
     const load = async () => {
       const { data } = await supabase
@@ -44,7 +42,6 @@ export default function TodayPage() {
     load();
   }, []);
 
-  // ================= FILTER =================
   const filteredProjects = projects.filter((p) => {
     if (filter === "all") return true;
     if (filter === "today") return p.date === todayStr;
@@ -56,7 +53,7 @@ export default function TodayPage() {
     <AuthGuard>
       <div className="p-4 space-y-4 bg-gray-100 min-h-screen">
 
-        <h1 className="text-2xl font-bold">
+        <h1 className="text-2xl font-bold text-gray-900">
           📍 Plan montaj
         </h1>
 
@@ -64,8 +61,10 @@ export default function TodayPage() {
         <div className="flex gap-2 mb-2">
           <button
             onClick={() => setFilter("all")}
-            className={`px-3 py-1 rounded ${
-              filter === "all" ? "bg-black text-white" : "bg-white"
+            className={`px-4 py-2 rounded font-semibold text-base border ${
+              filter === "all"
+                ? "bg-gray-900 text-white border-gray-900"
+                : "bg-white text-gray-800 border-gray-300"
             }`}
           >
             Toate
@@ -73,8 +72,10 @@ export default function TodayPage() {
 
           <button
             onClick={() => setFilter("today")}
-            className={`px-3 py-1 rounded ${
-              filter === "today" ? "bg-black text-white" : "bg-white"
+            className={`px-4 py-2 rounded font-semibold text-base border ${
+              filter === "today"
+                ? "bg-gray-900 text-white border-gray-900"
+                : "bg-white text-gray-800 border-gray-300"
             }`}
           >
             Azi
@@ -82,8 +83,10 @@ export default function TodayPage() {
 
           <button
             onClick={() => setFilter("tomorrow")}
-            className={`px-3 py-1 rounded ${
-              filter === "tomorrow" ? "bg-black text-white" : "bg-white"
+            className={`px-4 py-2 rounded font-semibold text-base border ${
+              filter === "tomorrow"
+                ? "bg-gray-900 text-white border-gray-900"
+                : "bg-white text-gray-800 border-gray-300"
             }`}
           >
             Mâine
@@ -92,7 +95,7 @@ export default function TodayPage() {
 
         {/* EMPTY STATE */}
         {filteredProjects.length === 0 && (
-          <p className="text-gray-500">
+          <p className="text-gray-600 font-medium">
             Nu există proiecte în perioada selectată
           </p>
         )}
@@ -101,19 +104,19 @@ export default function TodayPage() {
         {filteredProjects.map((p) => (
           <div
             key={p.id}
-            className="bg-white rounded-xl p-4 shadow active:scale-[0.98] transition"
+            className="bg-white rounded-xl p-4 shadow active:scale-[0.98] transition cursor-pointer"
             onClick={() => setSelected(p)}
           >
-            <div className="text-lg font-bold">{p.client}</div>
-            <div className="text-gray-600">📍 {p.location}</div>
+            <div className="text-lg font-bold text-gray-900">{p.client}</div>
+            <div className="text-gray-700 font-medium mt-1">📍 {p.location}</div>
 
-            <div className="mt-2">📅 {p.date}</div>
-            <div className="mt-2">⚡ {p.kw} kW</div>
-            <div>🔋 {p.battery}</div>
-            <div>📦 {p.panels} panouri</div>
-            <div>📞 {p.phone}</div>
+            <div className="mt-2 text-gray-800 font-medium">📅 {p.date}</div>
+            <div className="mt-1 text-gray-800 font-medium">⚡ {p.kw} kW</div>
+            <div className="text-gray-800 font-medium">🔋 {p.battery}</div>
+            <div className="text-gray-800 font-medium">📦 {p.panels} panouri</div>
+            <div className="text-gray-800 font-medium">📞 {p.phone}</div>
 
-            <div className="mt-2 font-semibold">
+            <div className="mt-2 font-bold text-gray-900">
               Status: {p.status}
             </div>
           </div>
@@ -123,29 +126,29 @@ export default function TodayPage() {
       {/* MODAL */}
       {selected && (
         <div className="fixed inset-0 bg-black/60 flex items-end z-50">
-          <div className="bg-white w-full rounded-t-2xl p-4">
+          <div className="bg-white w-full rounded-t-2xl p-5">
 
-            <div className="text-lg font-bold mb-2">
+            <div className="text-xl font-bold text-gray-900 mb-2">
               {selected.client}
             </div>
 
-            <div className="text-gray-600">
+            <div className="text-gray-700 font-medium">
               📍 {selected.location}
             </div>
 
-            <div className="mt-2">📅 {selected.date}</div>
-            <div className="mt-2">⚡ {selected.kw} kW</div>
-            <div>🔋 {selected.battery}</div>
-            <div>📦 {selected.panels}</div>
+            <div className="mt-2 text-gray-800 font-medium">📅 {selected.date}</div>
+            <div className="mt-1 text-gray-800 font-medium">⚡ {selected.kw} kW</div>
+            <div className="text-gray-800 font-medium">🔋 {selected.battery}</div>
+            <div className="text-gray-800 font-medium">📦 {selected.panels}</div>
 
-            <div className="mt-2 font-semibold">
+            <div className="mt-2 font-bold text-gray-900">
               Status: {selected.status}
             </div>
 
             <div className="flex gap-2 mt-4">
               <a
                 href={`tel:${selected.phone}`}
-                className="flex-1 bg-green-600 text-white text-center py-2 rounded"
+                className="flex-1 bg-green-600 text-white text-center py-3 rounded font-semibold text-base"
               >
                 📞 Sună
               </a>
@@ -153,14 +156,14 @@ export default function TodayPage() {
               <a
                 href={`https://www.google.com/maps/search/?api=1&query=${selected.location}`}
                 target="_blank"
-                className="flex-1 bg-blue-600 text-white text-center py-2 rounded"
+                className="flex-1 bg-blue-600 text-white text-center py-3 rounded font-semibold text-base"
               >
                 🧭 GPS
               </a>
             </div>
 
             <button
-              className="mt-3 w-full bg-gray-200 py-2 rounded"
+              className="mt-3 w-full bg-gray-200 text-gray-900 font-semibold py-3 rounded text-base"
               onClick={() => setSelected(null)}
             >
               Închide
