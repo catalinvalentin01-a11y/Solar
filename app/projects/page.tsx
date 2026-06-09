@@ -71,6 +71,11 @@ export default function ProjectsPage() {
   const [autoSaving, setAutoSaving] = useState(false);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Editare material în lista globală
+  const [editingMaterialId, setEditingMaterialId] = useState<string | null>(null);
+  const [editingMaterialName, setEditingMaterialName] = useState("");
+  const [editingMaterialUnit, setEditingMaterialUnit] = useState("");
+
   const [form, setForm] = useState<Project>({
     client: "",
     phone: "",
@@ -152,6 +157,7 @@ export default function ProjectsPage() {
     });
     setQuantities(q);
 
+    // FIX: salvat dacă ORICE rând are saved=true
     const anySaved = rows.some((r) => r.saved === true);
     setMaterialsSaved(anySaved);
   }
@@ -183,6 +189,7 @@ export default function ProjectsPage() {
     setQuantities({});
     setMaterialsSaved(false);
     setOpen(false);
+    setEditingMaterialId(null);
   };
 
   const handleSave = async () => {
@@ -288,6 +295,36 @@ export default function ProjectsPage() {
     await loadMaterials();
   };
 
+  const handleStartEditMaterial = (mat: Material) => {
+    setEditingMaterialId(mat.id);
+    setEditingMaterialName(mat.name);
+    setEditingMaterialUnit(mat.unit);
+  };
+
+  const handleCancelEditMaterial = () => {
+    setEditingMaterialId(null);
+    setEditingMaterialName("");
+    setEditingMaterialUnit("");
+  };
+
+  const handleSaveEditMaterial = async (materialId: string) => {
+    const name = editingMaterialName.trim();
+    if (!name) return;
+
+    const { error } = await supabase
+      .from("materials")
+      .update({ name, unit: editingMaterialUnit })
+      .eq("id", materialId);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setEditingMaterialId(null);
+    await loadMaterials();
+  };
+
   // Auto-save la fiecare modificare de cantitate (debounce 1s)
   const autoSaveQuantity = useCallback(
     async (materialId: string, value: string, currentProjectMaterials: ProjectMaterial[]) => {
@@ -323,6 +360,7 @@ export default function ProjectsPage() {
     [selectedProject]
   );
 
+  // FIX: Nu mai apelăm loadProjectMaterials după save — setăm direct state-ul
   const handleSaveMaterials = async () => {
     if (!selectedProject?.id) return;
 
@@ -346,8 +384,11 @@ export default function ProjectsPage() {
       }
     }
 
+    // FIX: Setăm direct saved=true fără a re-incarca din DB (care ar putea reseta starea)
     setMaterialsSaved(true);
-    await loadProjectMaterials(selectedProject.id);
+    setProjectMaterials((prev) =>
+      prev.map((pm) => ({ ...pm, saved: true }))
+    );
   };
 
   const handleUnlockMaterials = async () => {
@@ -359,7 +400,9 @@ export default function ProjectsPage() {
       .eq("project_id", selectedProject.id);
 
     setMaterialsSaved(false);
-    await loadProjectMaterials(selectedProject.id);
+    setProjectMaterials((prev) =>
+      prev.map((pm) => ({ ...pm, saved: false }))
+    );
   };
 
   // ── IMAGINI ────────────────────────────────────────────────
@@ -746,44 +789,84 @@ export default function ProjectsPage() {
                           {materials.map((mat) => (
                             <div
                               key={mat.id}
-                              className="flex items-center gap-3 p-2 bg-gray-50 rounded border border-gray-200"
+                              className="flex items-center gap-2 p-2 bg-gray-50 rounded border border-gray-200"
                             >
-                              <span className="flex-1 text-sm font-medium text-gray-800">
-                                {mat.name}
-                                <span className="text-gray-400 ml-1 text-xs">({mat.unit})</span>
-                              </span>
+                              {/* Mod editare */}
+                              {isAdmin && editingMaterialId === mat.id ? (
+                                <>
+                                  <input
+                                    className="border border-blue-400 p-1 rounded text-sm text-gray-900 flex-1 min-w-0"
+                                    value={editingMaterialName}
+                                    onChange={(e) => setEditingMaterialName(e.target.value)}
+                                    autoFocus
+                                  />
+                                  <input
+                                    className="border border-blue-400 p-1 rounded text-sm text-gray-900 w-16"
+                                    value={editingMaterialUnit}
+                                    onChange={(e) => setEditingMaterialUnit(e.target.value)}
+                                  />
+                                  <button
+                                    className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-semibold hover:bg-blue-700 transition whitespace-nowrap"
+                                    onClick={() => handleSaveEditMaterial(mat.id)}
+                                  >
+                                    ✓ Salvează
+                                  </button>
+                                  <button
+                                    className="bg-gray-300 text-gray-700 px-2 py-1 rounded text-xs font-semibold hover:bg-gray-400 transition"
+                                    onClick={handleCancelEditMaterial}
+                                  >
+                                    ✕
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="flex-1 text-sm font-medium text-gray-800 min-w-0">
+                                    {mat.name}
+                                    <span className="text-gray-400 ml-1 text-xs">({mat.unit})</span>
+                                  </span>
 
-                              <input
-                                type="number"
-                                min="0"
-                                className={`border border-gray-300 p-2 rounded text-sm text-gray-900 w-24 text-center
-                                  ${materialsSaved && !isAdmin ? "bg-gray-100 text-gray-500 cursor-not-allowed" : "bg-white"}`}
-                                placeholder="0"
-                                value={quantities[mat.id] || ""}
-                                disabled={materialsSaved && !isAdmin}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setQuantities((prev) => ({ ...prev, [mat.id]: val }));
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    className={`border border-gray-300 p-2 rounded text-sm text-gray-900 w-24 text-center shrink-0
+                                      ${materialsSaved && !isAdmin ? "bg-gray-100 text-gray-500 cursor-not-allowed" : "bg-white"}`}
+                                    placeholder="0"
+                                    value={quantities[mat.id] || ""}
+                                    disabled={materialsSaved && !isAdmin}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setQuantities((prev) => ({ ...prev, [mat.id]: val }));
 
-                                  // Debounce auto-save
-                                  if (debounceRef.current) clearTimeout(debounceRef.current);
-                                  debounceRef.current = setTimeout(() => {
-                                    autoSaveQuantity(mat.id, val, projectMaterials);
-                                  }, 1000);
-                                }}
-                              />
+                                      // Debounce auto-save
+                                      if (debounceRef.current) clearTimeout(debounceRef.current);
+                                      debounceRef.current = setTimeout(() => {
+                                        autoSaveQuantity(mat.id, val, projectMaterials);
+                                      }, 1000);
+                                    }}
+                                  />
 
-                              <span className="text-xs text-gray-400 w-8">{mat.unit}</span>
+                                  <span className="text-xs text-gray-400 w-8 shrink-0">{mat.unit}</span>
 
-                              {/* Admin: șterge material din lista globală */}
-                              {isAdmin && (
-                                <button
-                                  className="text-red-500 hover:text-red-700 text-sm font-bold px-1"
-                                  onClick={() => handleDeleteMaterial(mat.id)}
-                                  title="Șterge material"
-                                >
-                                  ✕
-                                </button>
+                                  {/* Admin: editează / șterge material din lista globală */}
+                                  {isAdmin && (
+                                    <>
+                                      <button
+                                        className="text-blue-500 hover:text-blue-700 text-sm font-bold px-1 shrink-0"
+                                        onClick={() => handleStartEditMaterial(mat)}
+                                        title="Editează material"
+                                      >
+                                        ✏️
+                                      </button>
+                                      <button
+                                        className="text-red-500 hover:text-red-700 text-sm font-bold px-1 shrink-0"
+                                        onClick={() => handleDeleteMaterial(mat.id)}
+                                        title="Șterge material"
+                                      >
+                                        ✕
+                                      </button>
+                                    </>
+                                  )}
+                                </>
                               )}
                             </div>
                           ))}
@@ -798,6 +881,7 @@ export default function ProjectsPage() {
                       {/* Butoane Salvează / Deblochează */}
                       {materials.length > 0 && (
                         <div className="mt-4 flex flex-wrap gap-2 items-center">
+                          {/* FIX: Butonul de salvare apare și pentru non-admin când nu e salvat */}
                           {!materialsSaved && (
                             <button
                               className="bg-blue-600 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-blue-700 transition"
