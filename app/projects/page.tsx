@@ -29,6 +29,20 @@ type Project = {
   date?: string;
 };
 
+type Material = {
+  id: string;
+  name: string;
+  unit: string;
+};
+
+type ProjectMaterial = {
+  id?: string;
+  project_id: string;
+  material_id: string;
+  quantity: string;
+  saved: boolean;
+};
+
 export default function ProjectsPage() {
   const [events, setEvents] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
@@ -45,6 +59,15 @@ export default function ProjectsPage() {
   const [showTechnical, setShowTechnical] = useState(true);
   const [showRoof, setShowRoof] = useState(true);
   const [showSimulation, setShowSimulation] = useState(true);
+  const [showMaterials, setShowMaterials] = useState(true);
+
+  // Materiale
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [projectMaterials, setProjectMaterials] = useState<ProjectMaterial[]>([]);
+  const [quantities, setQuantities] = useState<Record<string, string>>({});
+  const [materialsSaved, setMaterialsSaved] = useState(false);
+  const [newMaterialName, setNewMaterialName] = useState("");
+  const [newMaterialUnit, setNewMaterialUnit] = useState("buc");
 
   const [form, setForm] = useState<Project>({
     client: "",
@@ -93,8 +116,49 @@ export default function ProjectsPage() {
     setEvents([...calendarEvents]);
   }
 
+  async function loadMaterials() {
+    const { data, error } = await supabase
+      .from("materials")
+      .select("*")
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    setMaterials(data || []);
+  }
+
+  async function loadProjectMaterials(projectId: string) {
+    const { data, error } = await supabase
+      .from("project_materials")
+      .select("*")
+      .eq("project_id", projectId);
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    const rows = data || [];
+    setProjectMaterials(rows);
+
+    // Populează cantitățile din baza de date
+    const q: Record<string, string> = {};
+    rows.forEach((row) => {
+      q[row.material_id] = row.quantity || "";
+    });
+    setQuantities(q);
+
+    // Dacă există cel puțin un rând salvat, considerăm că sunt salvate
+    const anySaved = rows.some((r) => r.saved === true);
+    setMaterialsSaved(anySaved);
+  }
+
   useEffect(() => {
     loadProjects();
+    loadMaterials();
   }, []);
 
   const resetForm = () => {
@@ -115,6 +179,9 @@ export default function ProjectsPage() {
     });
     setSelectedProject(null);
     setSelectedDate(null);
+    setProjectMaterials([]);
+    setQuantities({});
+    setMaterialsSaved(false);
     setOpen(false);
   };
 
@@ -183,6 +250,88 @@ export default function ProjectsPage() {
     await loadProjects();
     resetForm();
   };
+
+  // ── MATERIALE ──────────────────────────────────────────────
+
+  const handleAddMaterial = async () => {
+    const name = newMaterialName.trim();
+    if (!name) return;
+
+    const { error } = await supabase
+      .from("materials")
+      .insert({ name, unit: newMaterialUnit });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setNewMaterialName("");
+    setNewMaterialUnit("buc");
+    await loadMaterials();
+  };
+
+  const handleDeleteMaterial = async (materialId: string) => {
+    const ok = confirm("Ștergi materialul din listă?");
+    if (!ok) return;
+
+    const { error } = await supabase
+      .from("materials")
+      .delete()
+      .eq("id", materialId);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    await loadMaterials();
+  };
+
+  const handleSaveMaterials = async () => {
+    if (!selectedProject?.id) return;
+
+    for (const material of materials) {
+      const qty = quantities[material.id] || "";
+      const existing = projectMaterials.find(
+        (pm) => pm.material_id === material.id
+      );
+
+      if (existing?.id) {
+        // Update
+        await supabase
+          .from("project_materials")
+          .update({ quantity: qty, saved: true, saved_at: new Date().toISOString() })
+          .eq("id", existing.id);
+      } else {
+        // Insert
+        await supabase.from("project_materials").insert({
+          project_id: selectedProject.id,
+          material_id: material.id,
+          quantity: qty,
+          saved: true,
+          saved_at: new Date().toISOString(),
+        });
+      }
+    }
+
+    setMaterialsSaved(true);
+    await loadProjectMaterials(selectedProject.id);
+  };
+
+  const handleUnlockMaterials = async () => {
+    if (!selectedProject?.id) return;
+
+    await supabase
+      .from("project_materials")
+      .update({ saved: false, saved_at: null })
+      .eq("project_id", selectedProject.id);
+
+    setMaterialsSaved(false);
+    await loadProjectMaterials(selectedProject.id);
+  };
+
+  // ── IMAGINI ────────────────────────────────────────────────
 
   const deleteImage = async (imgToDelete: string, type: "roof" | "simulation") => {
     setForm((prev) => {
@@ -270,38 +419,30 @@ export default function ProjectsPage() {
       <div className="p-2 md:p-6">
 
         <style>{`
-          /* Fix mobil FullCalendar */
           .fc {
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
             text-rendering: optimizeLegibility;
             font-size: 14px;
           }
-          .fc table {
-            border-collapse: collapse;
-          }
-          .fc td, .fc th {
-            border-width: 1px !important;
-          }
+          .fc table { border-collapse: collapse; }
+          .fc td, .fc th { border-width: 1px !important; }
           .fc .fc-scrollgrid {
             transform: translateZ(0);
             backface-visibility: hidden;
           }
-          /* Ziua din calendar - text mai vizibil */
           .fc .fc-daygrid-day-number {
             font-size: 14px !important;
             font-weight: 600 !important;
             color: #111827 !important;
             padding: 4px 6px !important;
           }
-          /* Numele zilelor (Lun, Mar..) */
           .fc .fc-col-header-cell-cushion {
             font-size: 13px !important;
             font-weight: 700 !important;
             color: #111827 !important;
             padding: 6px 4px !important;
           }
-          /* Toolbar - luna si butoanele de navigare */
           .fc .fc-toolbar-title {
             font-size: 16px !important;
             font-weight: 700 !important;
@@ -312,34 +453,18 @@ export default function ProjectsPage() {
             font-weight: 600 !important;
             padding: 5px 10px !important;
           }
-          /* Evenimentele din calendar */
           .fc .fc-event-title {
             font-size: 12px !important;
             font-weight: 600 !important;
           }
-          /* Ziua de azi - mai vizibila */
-          .fc .fc-day-today {
-            background-color: #eff6ff !important;
-          }
-          .fc .fc-day-today .fc-daygrid-day-number {
-            color: #1d4ed8 !important;
-          }
+          .fc .fc-day-today { background-color: #eff6ff !important; }
+          .fc .fc-day-today .fc-daygrid-day-number { color: #1d4ed8 !important; }
           @media (max-width: 640px) {
-            .fc .fc-toolbar-title {
-              font-size: 15px !important;
-            }
-            .fc .fc-toolbar {
-              gap: 6px !important;
-            }
-            .fc .fc-daygrid-day-number {
-              font-size: 13px !important;
-            }
-            .fc .fc-col-header-cell-cushion {
-              font-size: 11px !important;
-            }
-            .fc .fc-event-title {
-              font-size: 11px !important;
-            }
+            .fc .fc-toolbar-title { font-size: 15px !important; }
+            .fc .fc-toolbar { gap: 6px !important; }
+            .fc .fc-daygrid-day-number { font-size: 13px !important; }
+            .fc .fc-col-header-cell-cushion { font-size: 11px !important; }
+            .fc .fc-event-title { font-size: 11px !important; }
           }
         `}</style>
 
@@ -354,6 +479,9 @@ export default function ProjectsPage() {
               if (!isAdmin) return;
               setSelectedProject(null);
               setSelectedDate(info.dateStr);
+              setProjectMaterials([]);
+              setQuantities({});
+              setMaterialsSaved(false);
               setOpen(true);
             }}
             eventClick={(info) => {
@@ -375,6 +503,8 @@ export default function ProjectsPage() {
                 roof_images: p.roof_images || [],
                 simulation_images: p.simulation_images || [],
               });
+              // Încarcă materialele pentru proiectul deschis
+              loadProjectMaterials(info.event.id);
               setOpen(true);
             }}
           />
@@ -417,7 +547,7 @@ export default function ProjectsPage() {
                 </div>
               )}
 
-              {/* Sectiune Date Client */}
+              {/* Date Client */}
               <button
                 className="w-full text-left font-bold text-gray-900 bg-gray-100 p-3 rounded text-base"
                 onClick={() => setShowClient(!showClient)}
@@ -429,55 +559,23 @@ export default function ProjectsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-2 mt-1">
                   {isAdmin ? (
                     <>
-                      <input
-                        className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500"
-                        placeholder="Client"
-                        value={form.client}
-                        onChange={(e) => setForm({ ...form, client: e.target.value })}
-                      />
-                      <input
-                        className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500"
-                        placeholder="Telefon"
-                        value={form.phone}
-                        onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                      />
-                      <input
-                        className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500"
-                        placeholder="Email"
-                        value={form.email}
-                        onChange={(e) => setForm({ ...form, email: e.target.value })}
-                      />
-                      <input
-                        className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500"
-                        placeholder="Locație"
-                        value={form.location}
-                        onChange={(e) => setForm({ ...form, location: e.target.value })}
-                      />
+                      <input className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500" placeholder="Client" value={form.client} onChange={(e) => setForm({ ...form, client: e.target.value })} />
+                      <input className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500" placeholder="Telefon" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                      <input className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                      <input className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500" placeholder="Locație" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
                     </>
                   ) : (
                     <>
-                      <div className="p-2 bg-gray-50 rounded">
-                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Client</p>
-                        <p className="font-semibold text-gray-900 text-base mt-1">{form.client || "—"}</p>
-                      </div>
-                      <div className="p-2 bg-gray-50 rounded">
-                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Telefon</p>
-                        <p className="font-semibold text-gray-900 text-base mt-1">{form.phone || "—"}</p>
-                      </div>
-                      <div className="p-2 bg-gray-50 rounded">
-                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Email</p>
-                        <p className="font-semibold text-gray-900 text-base mt-1">{form.email || "—"}</p>
-                      </div>
-                      <div className="p-2 bg-gray-50 rounded">
-                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Locație</p>
-                        <p className="font-semibold text-gray-900 text-base mt-1">{form.location || "—"}</p>
-                      </div>
+                      <div className="p-2 bg-gray-50 rounded"><p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Client</p><p className="font-semibold text-gray-900 text-base mt-1">{form.client || "—"}</p></div>
+                      <div className="p-2 bg-gray-50 rounded"><p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Telefon</p><p className="font-semibold text-gray-900 text-base mt-1">{form.phone || "—"}</p></div>
+                      <div className="p-2 bg-gray-50 rounded"><p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Email</p><p className="font-semibold text-gray-900 text-base mt-1">{form.email || "—"}</p></div>
+                      <div className="p-2 bg-gray-50 rounded"><p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Locație</p><p className="font-semibold text-gray-900 text-base mt-1">{form.location || "—"}</p></div>
                     </>
                   )}
                 </div>
               )}
 
-              {/* Sectiune Date Tehnice */}
+              {/* Date Tehnice */}
               <button
                 className="w-full text-left font-bold text-gray-900 bg-gray-100 p-3 rounded mt-3 text-base"
                 onClick={() => setShowTechnical(!showTechnical)}
@@ -489,89 +587,33 @@ export default function ProjectsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-2 mt-1">
                   {isAdmin ? (
                     <>
-                      <input
-                        className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500"
-                        placeholder="Titlu proiect"
-                        value={form.title}
-                        onChange={(e) => setForm({ ...form, title: e.target.value })}
-                      />
-                      <input
-                        className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500"
-                        placeholder="kW"
-                        value={form.kw}
-                        onChange={(e) => setForm({ ...form, kw: e.target.value })}
-                      />
-                      <input
-                        className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500"
-                        placeholder="Panouri"
-                        value={form.panels}
-                        onChange={(e) => setForm({ ...form, panels: e.target.value })}
-                      />
-                      <input
-                        className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500"
-                        placeholder="Invertor"
-                        value={form.inverter}
-                        onChange={(e) => setForm({ ...form, inverter: e.target.value })}
-                      />
-                      <input
-                        className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500"
-                        placeholder="Baterie"
-                        value={form.battery}
-                        onChange={(e) => setForm({ ...form, battery: e.target.value })}
-                      />
-                      <select
-                        className="border border-gray-300 p-3 rounded text-base text-gray-900"
-                        value={form.status}
-                        onChange={(e) => setForm({ ...form, status: e.target.value })}
-                      >
+                      <input className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500" placeholder="Titlu proiect" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+                      <input className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500" placeholder="kW" value={form.kw} onChange={(e) => setForm({ ...form, kw: e.target.value })} />
+                      <input className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500" placeholder="Panouri" value={form.panels} onChange={(e) => setForm({ ...form, panels: e.target.value })} />
+                      <input className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500" placeholder="Invertor" value={form.inverter} onChange={(e) => setForm({ ...form, inverter: e.target.value })} />
+                      <input className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500" placeholder="Baterie" value={form.battery} onChange={(e) => setForm({ ...form, battery: e.target.value })} />
+                      <select className="border border-gray-300 p-3 rounded text-base text-gray-900" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
                         <option>Programat</option>
                         <option>În lucru</option>
                         <option>Finalizat</option>
                       </select>
-                      <textarea
-                        className="border border-gray-300 p-3 rounded col-span-1 sm:col-span-2 text-base text-gray-900 placeholder-gray-500"
-                        placeholder="Observații"
-                        rows={4}
-                        value={form.notes}
-                        onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                      />
+                      <textarea className="border border-gray-300 p-3 rounded col-span-1 sm:col-span-2 text-base text-gray-900 placeholder-gray-500" placeholder="Observații" rows={4} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
                     </>
                   ) : (
                     <>
-                      <div className="p-2 bg-gray-50 rounded">
-                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Titlu proiect</p>
-                        <p className="font-semibold text-gray-900 text-base mt-1">{form.title || "—"}</p>
-                      </div>
-                      <div className="p-2 bg-gray-50 rounded">
-                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">kW</p>
-                        <p className="font-semibold text-gray-900 text-base mt-1">{form.kw || "—"}</p>
-                      </div>
-                      <div className="p-2 bg-gray-50 rounded">
-                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Panouri</p>
-                        <p className="font-semibold text-gray-900 text-base mt-1">{form.panels || "—"}</p>
-                      </div>
-                      <div className="p-2 bg-gray-50 rounded">
-                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Invertor</p>
-                        <p className="font-semibold text-gray-900 text-base mt-1">{form.inverter || "—"}</p>
-                      </div>
-                      <div className="p-2 bg-gray-50 rounded">
-                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Baterie</p>
-                        <p className="font-semibold text-gray-900 text-base mt-1">{form.battery || "—"}</p>
-                      </div>
-                      <div className="p-2 bg-gray-50 rounded">
-                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</p>
-                        <p className="font-semibold text-gray-900 text-base mt-1">{form.status || "—"}</p>
-                      </div>
-                      <div className="p-2 bg-gray-50 rounded col-span-1 sm:col-span-2">
-                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Observații</p>
-                        <p className="font-semibold text-gray-900 text-base mt-1 whitespace-pre-wrap">{form.notes || "—"}</p>
-                      </div>
+                      <div className="p-2 bg-gray-50 rounded"><p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Titlu proiect</p><p className="font-semibold text-gray-900 text-base mt-1">{form.title || "—"}</p></div>
+                      <div className="p-2 bg-gray-50 rounded"><p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">kW</p><p className="font-semibold text-gray-900 text-base mt-1">{form.kw || "—"}</p></div>
+                      <div className="p-2 bg-gray-50 rounded"><p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Panouri</p><p className="font-semibold text-gray-900 text-base mt-1">{form.panels || "—"}</p></div>
+                      <div className="p-2 bg-gray-50 rounded"><p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Invertor</p><p className="font-semibold text-gray-900 text-base mt-1">{form.inverter || "—"}</p></div>
+                      <div className="p-2 bg-gray-50 rounded"><p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Baterie</p><p className="font-semibold text-gray-900 text-base mt-1">{form.battery || "—"}</p></div>
+                      <div className="p-2 bg-gray-50 rounded"><p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</p><p className="font-semibold text-gray-900 text-base mt-1">{form.status || "—"}</p></div>
+                      <div className="p-2 bg-gray-50 rounded col-span-1 sm:col-span-2"><p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Observații</p><p className="font-semibold text-gray-900 text-base mt-1 whitespace-pre-wrap">{form.notes || "—"}</p></div>
                     </>
                   )}
                 </div>
               )}
 
-              {/* Sectiune Poze Acoperis */}
+              {/* Poze Acoperis */}
               <button
                 className="w-full text-left font-bold text-gray-900 bg-gray-100 p-3 rounded mt-3 text-base"
                 onClick={() => setShowRoof(!showRoof)}
@@ -582,10 +624,7 @@ export default function ProjectsPage() {
               {showRoof && (
                 <div className="p-2 mt-1">
                   {isAdmin && (
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="mb-3 text-sm text-gray-700"
+                    <input type="file" accept="image/*" className="mb-3 text-sm text-gray-700"
                       onChange={async (e) => {
                         const file = e.target.files?.[0];
                         if (!file) return;
@@ -595,23 +634,13 @@ export default function ProjectsPage() {
                   )}
                   <div className="grid grid-cols-3 gap-2">
                     {form.roof_images.map((img, i) => (
-                      <img
-                        key={img}
-                        src={img}
-                        alt=""
-                        onClick={() => {
-                          setLightboxImages(form.roof_images || []);
-                          setActiveIndex(i);
-                          setOpenLightbox(true);
-                        }}
-                        className="rounded border h-28 w-full object-cover cursor-pointer"
-                      />
+                      <img key={img} src={img} alt="" onClick={() => { setLightboxImages(form.roof_images || []); setActiveIndex(i); setOpenLightbox(true); }} className="rounded border h-28 w-full object-cover cursor-pointer" />
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* Sectiune Simulare */}
+              {/* Simulare */}
               <button
                 className="w-full text-left font-bold text-gray-900 bg-gray-100 p-3 rounded mt-3 text-base"
                 onClick={() => setShowSimulation(!showSimulation)}
@@ -622,10 +651,7 @@ export default function ProjectsPage() {
               {showSimulation && (
                 <div className="p-2 mt-1">
                   {isAdmin && (
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="mb-3 text-sm text-gray-700"
+                    <input type="file" accept="image/*" className="mb-3 text-sm text-gray-700"
                       onChange={async (e) => {
                         const file = e.target.files?.[0];
                         if (!file) return;
@@ -635,22 +661,136 @@ export default function ProjectsPage() {
                   )}
                   <div className="grid grid-cols-3 gap-2">
                     {form.simulation_images.map((img, i) => (
-                      <img
-                        key={img}
-                        src={img}
-                        alt=""
-                        onClick={() => {
-                          setLightboxImages(form.simulation_images || []);
-                          setActiveIndex(i);
-                          setOpenLightbox(true);
-                        }}
-                        className="rounded border h-28 w-full object-cover cursor-pointer"
-                      />
+                      <img key={img} src={img} alt="" onClick={() => { setLightboxImages(form.simulation_images || []); setActiveIndex(i); setOpenLightbox(true); }} className="rounded border h-28 w-full object-cover cursor-pointer" />
                     ))}
                   </div>
                 </div>
               )}
 
+              {/* ── MATERIALE FOLOSITE ── */}
+              {selectedProject && (
+                <>
+                  <button
+                    className="w-full text-left font-bold text-gray-900 bg-gray-100 p-3 rounded mt-3 text-base"
+                    onClick={() => setShowMaterials(!showMaterials)}
+                  >
+                    🔧 Materiale folosite {showMaterials ? "▲" : "▼"}
+                  </button>
+
+                  {showMaterials && (
+                    <div className="p-2 mt-1">
+
+                      {/* Admin: adaugă material nou în listă */}
+                      {isAdmin && (
+                        <div className="flex flex-wrap gap-2 mb-4">
+                          <input
+                            className="border border-gray-300 p-2 rounded text-sm text-gray-900 placeholder-gray-500 flex-1 min-w-[150px]"
+                            placeholder="Nume material (ex: Clemă capăt)"
+                            value={newMaterialName}
+                            onChange={(e) => setNewMaterialName(e.target.value)}
+                          />
+                          <input
+                            className="border border-gray-300 p-2 rounded text-sm text-gray-900 w-24"
+                            placeholder="U.M. (buc)"
+                            value={newMaterialUnit}
+                            onChange={(e) => setNewMaterialUnit(e.target.value)}
+                          />
+                          <button
+                            className="bg-green-600 text-white px-3 py-2 rounded text-sm font-semibold hover:bg-green-700 transition"
+                            onClick={handleAddMaterial}
+                          >
+                            + Adaugă
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Lista materiale */}
+                      {materials.length === 0 ? (
+                        <p className="text-sm text-gray-500 italic">
+                          {isAdmin
+                            ? "Nu există materiale definite. Adaugă primul material mai sus."
+                            : "Nu există materiale definite de admin."}
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {materials.map((mat) => (
+                            <div
+                              key={mat.id}
+                              className="flex items-center gap-3 p-2 bg-gray-50 rounded border border-gray-200"
+                            >
+                              <span className="flex-1 text-sm font-medium text-gray-800">
+                                {mat.name}
+                                <span className="text-gray-400 ml-1 text-xs">({mat.unit})</span>
+                              </span>
+
+                              <input
+                                type="number"
+                                min="0"
+                                className={`border border-gray-300 p-2 rounded text-sm text-gray-900 w-24 text-center
+                                  ${materialsSaved && !isAdmin ? "bg-gray-100 text-gray-500 cursor-not-allowed" : "bg-white"}`}
+                                placeholder="0"
+                                value={quantities[mat.id] || ""}
+                                disabled={materialsSaved && !isAdmin}
+                                onChange={(e) =>
+                                  setQuantities((prev) => ({
+                                    ...prev,
+                                    [mat.id]: e.target.value,
+                                  }))
+                                }
+                              />
+
+                              <span className="text-xs text-gray-400 w-8">{mat.unit}</span>
+
+                              {/* Admin: șterge material din lista globală */}
+                              {isAdmin && (
+                                <button
+                                  className="text-red-500 hover:text-red-700 text-sm font-bold px-1"
+                                  onClick={() => handleDeleteMaterial(mat.id)}
+                                  title="Șterge material"
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Butoane Salvează / Deblochează */}
+                      {materials.length > 0 && (
+                        <div className="mt-4 flex flex-wrap gap-2 items-center">
+                          {!materialsSaved && (
+                            <button
+                              className="bg-blue-600 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-blue-700 transition"
+                              onClick={handleSaveMaterials}
+                            >
+                              💾 Salvează materiale
+                            </button>
+                          )}
+
+                          {materialsSaved && (
+                            <span className="text-sm text-green-700 font-semibold flex items-center gap-1">
+                              ✅ Materiale salvate
+                            </span>
+                          )}
+
+                          {materialsSaved && isAdmin && (
+                            <button
+                              className="bg-orange-500 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-orange-600 transition"
+                              onClick={handleUnlockMaterials}
+                            >
+                              🔓 Deblochează pentru modificare
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Butoane jos */}
               <div className="flex flex-wrap gap-2 mt-6">
                 <button
                   className="bg-gray-300 text-gray-800 font-semibold px-4 py-3 rounded text-base"
