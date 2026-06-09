@@ -15,13 +15,6 @@ export default function Page() {
       <div className="flex gap-3 flex-wrap">
 
         <Link
-          href="/login"
-          className="bg-blue-600 text-white px-4 py-2 rounded"
-        >
-          Login / Înregistrare
-        </Link>
-
-        <Link
           href="/projects"
           className="bg-gray-800 text-white px-4 py-2 rounded"
         >
