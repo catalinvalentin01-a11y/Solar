@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
@@ -68,6 +68,8 @@ export default function ProjectsPage() {
   const [materialsSaved, setMaterialsSaved] = useState(false);
   const [newMaterialName, setNewMaterialName] = useState("");
   const [newMaterialUnit, setNewMaterialUnit] = useState("buc");
+  const [autoSaving, setAutoSaving] = useState(false);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   const [form, setForm] = useState<Project>({
     client: "",
@@ -144,14 +146,12 @@ export default function ProjectsPage() {
     const rows = data || [];
     setProjectMaterials(rows);
 
-    // Populează cantitățile din baza de date
     const q: Record<string, string> = {};
     rows.forEach((row) => {
       q[row.material_id] = row.quantity || "";
     });
     setQuantities(q);
 
-    // Dacă există cel puțin un rând salvat, considerăm că sunt salvate
     const anySaved = rows.some((r) => r.saved === true);
     setMaterialsSaved(anySaved);
   }
@@ -288,23 +288,54 @@ export default function ProjectsPage() {
     await loadMaterials();
   };
 
+  // Auto-save la fiecare modificare de cantitate (debounce 1s)
+  const autoSaveQuantity = useCallback(
+    async (materialId: string, value: string, currentProjectMaterials: ProjectMaterial[]) => {
+      if (!selectedProject?.id) return;
+      setAutoSaving(true);
+
+      const existing = currentProjectMaterials.find((pm) => pm.material_id === materialId);
+
+      if (existing?.id) {
+        await supabase
+          .from("project_materials")
+          .update({ quantity: value, saved: false })
+          .eq("id", existing.id);
+      } else {
+        const { data } = await supabase
+          .from("project_materials")
+          .insert({
+            project_id: selectedProject.id,
+            material_id: materialId,
+            quantity: value,
+            saved: false,
+          })
+          .select()
+          .single();
+
+        if (data) {
+          setProjectMaterials((prev) => [...prev, data]);
+        }
+      }
+
+      setAutoSaving(false);
+    },
+    [selectedProject]
+  );
+
   const handleSaveMaterials = async () => {
     if (!selectedProject?.id) return;
 
     for (const material of materials) {
       const qty = quantities[material.id] || "";
-      const existing = projectMaterials.find(
-        (pm) => pm.material_id === material.id
-      );
+      const existing = projectMaterials.find((pm) => pm.material_id === material.id);
 
       if (existing?.id) {
-        // Update
         await supabase
           .from("project_materials")
           .update({ quantity: qty, saved: true, saved_at: new Date().toISOString() })
           .eq("id", existing.id);
       } else {
-        // Insert
         await supabase.from("project_materials").insert({
           project_id: selectedProject.id,
           material_id: material.id,
@@ -503,7 +534,6 @@ export default function ProjectsPage() {
                 roof_images: p.roof_images || [],
                 simulation_images: p.simulation_images || [],
               });
-              // Încarcă materialele pentru proiectul deschis
               loadProjectMaterials(info.event.id);
               setOpen(true);
             }}
@@ -731,12 +761,16 @@ export default function ProjectsPage() {
                                 placeholder="0"
                                 value={quantities[mat.id] || ""}
                                 disabled={materialsSaved && !isAdmin}
-                                onChange={(e) =>
-                                  setQuantities((prev) => ({
-                                    ...prev,
-                                    [mat.id]: e.target.value,
-                                  }))
-                                }
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setQuantities((prev) => ({ ...prev, [mat.id]: val }));
+
+                                  // Debounce auto-save
+                                  if (debounceRef.current) clearTimeout(debounceRef.current);
+                                  debounceRef.current = setTimeout(() => {
+                                    autoSaveQuantity(mat.id, val, projectMaterials);
+                                  }, 1000);
+                                }}
                               />
 
                               <span className="text-xs text-gray-400 w-8">{mat.unit}</span>
@@ -754,6 +788,11 @@ export default function ProjectsPage() {
                             </div>
                           ))}
                         </div>
+                      )}
+
+                      {/* Indicator auto-save */}
+                      {autoSaving && (
+                        <p className="text-xs text-gray-400 italic mt-2">⏳ Se salvează automat...</p>
                       )}
 
                       {/* Butoane Salvează / Deblochează */}
