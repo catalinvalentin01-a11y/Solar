@@ -4,11 +4,11 @@ export default function Page() {
   return (
     <div className="p-6">
 
-      <h1 className="text-2xl font-bold mb-2">
+      <h1 className="text-2xl font-bold mb-2 text-gray-900" style={{ fontFamily: "inherit" }}>
         Dashboard
       </h1>
 
-      <p className="mb-6">
+      <p className="mb-6 text-gray-700" style={{ fontFamily: "inherit" }}>
         Bine ai venit în Solar CRM
       </p>
 

@@ -279,6 +279,61 @@ export default function ProjectsPage() {
     setProjectMaterials((prev) => prev.map((pm) => ({ ...pm, saved: false })));
   };
 
+  const handlePrintMaterials = () => {
+    const printContent = `
+      <html>
+      <head>
+        <title>Materiale — ${form.client} / ${form.title}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 32px; color: #111; }
+          h1 { font-size: 20px; margin-bottom: 4px; }
+          p { font-size: 13px; color: #555; margin-bottom: 24px; }
+          table { width: 100%; border-collapse: collapse; }
+          th { background: #f3f4f6; text-align: left; padding: 10px 12px; font-size: 13px; border: 1px solid #e5e7eb; }
+          td { padding: 10px 12px; font-size: 13px; border: 1px solid #e5e7eb; }
+          tr:nth-child(even) td { background: #f9fafb; }
+          .qty { font-weight: bold; text-align: center; }
+          .empty { color: #aaa; text-align: center; }
+          @media print { body { padding: 16px; } }
+        </style>
+      </head>
+      <body>
+        <h1>Lista materiale — ${form.client || "—"}</h1>
+        <p>
+          Proiect: ${form.title || "—"} &nbsp;|&nbsp;
+          Locație: ${form.location || "—"} &nbsp;|&nbsp;
+          Data: ${selectedDate || "—"}
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Material</th>
+              <th>U.M.</th>
+              <th>Cantitate</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${materials.map((mat, i) => `
+              <tr>
+                <td>${i + 1}</td>
+                <td>${mat.name}</td>
+                <td>${mat.unit}</td>
+                <td class="${quantities[mat.id] ? "qty" : "empty"}">${quantities[mat.id] || "—"}</td>
+              </tr>`).join("")}
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(printContent);
+    win.document.close();
+    win.focus();
+    win.print();
+  };
+
   // ── POZE MONTAJ ──────────────────────────────────────────────
 
   const handleAddCategory = async () => {
@@ -848,9 +903,25 @@ export default function ProjectsPage() {
 
                       {materials.length > 0 && (
                         <div className="mt-4 flex flex-wrap gap-2 items-center">
-                          {!materialsSaved && <button className="bg-blue-600 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-blue-700 transition" onClick={handleSaveMaterials}>💾 Salvează materiale</button>}
+                          {!materialsSaved && (
+                            <button className="bg-blue-600 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-blue-700 transition" onClick={handleSaveMaterials}>
+                              💾 Salvează materiale
+                            </button>
+                          )}
                           {materialsSaved && <span className="text-sm text-green-700 font-semibold">✅ Materiale salvate</span>}
-                          {materialsSaved && isAdmin && <button className="bg-orange-500 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-orange-600 transition" onClick={handleUnlockMaterials}>🔓 Deblochează pentru modificare</button>}
+                          {materialsSaved && isAdmin && (
+                            <button className="bg-orange-500 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-orange-600 transition" onClick={handleUnlockMaterials}>
+                              🔓 Deblochează pentru modificare
+                            </button>
+                          )}
+                          {isAdmin && (
+                            <button
+                              className="bg-gray-700 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-gray-800 transition"
+                              onClick={handlePrintMaterials}
+                            >
+                              🖨️ Printează materiale
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>

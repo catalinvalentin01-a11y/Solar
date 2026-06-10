@@ -121,13 +121,13 @@ export default function ClientsPage() {
       c.cod_montaj?.toLowerCase().includes(search.toLowerCase())
   );
 
-  if (loading) return <div className="p-6">Se încarcă...</div>;
+  if (loading) return <div className="p-6 text-gray-900" style={{ fontFamily: "inherit" }}>Se încarcă...</div>;
 
   if (!isAdmin) {
     return (
       <AuthGuard>
         <div className="flex items-center justify-center h-96">
-          <p className="text-gray-400">Nu ai acces la această secțiune.</p>
+          <p className="text-gray-400" style={{ fontFamily: "inherit" }}>Nu ai acces la această secțiune.</p>
         </div>
       </AuthGuard>
     );
@@ -135,9 +135,9 @@ export default function ClientsPage() {
 
   return (
     <AuthGuard>
-      <div className="p-6 max-w-5xl">
+      <div className="p-6 max-w-5xl" style={{ fontFamily: "inherit" }}>
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold">Clienți</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Clienți</h1>
           <button
             onClick={() => {
               setForm(emptyForm);
@@ -153,38 +153,38 @@ export default function ClientsPage() {
         {/* FORM MODAL */}
         {showForm && (
           <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-lg max-h-screen overflow-y-auto">
-              <h2 className="text-lg font-semibold mb-4">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-lg max-h-screen overflow-y-auto" style={{ fontFamily: "inherit" }}>
+              <h2 className="text-lg font-semibold mb-4 text-gray-900">
                 {editingId ? "Editează client" : "Client nou"}
               </h2>
 
               <div className="space-y-3">
                 <input
-                  className="border p-2 w-full rounded-lg"
+                  className="border p-2 w-full rounded-lg text-gray-900 text-base"
                   placeholder="Nume și Prenume *"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                 />
                 <input
-                  className="border p-2 w-full rounded-lg"
+                  className="border p-2 w-full rounded-lg text-gray-900 text-base"
                   placeholder="Telefon"
                   value={form.phone}
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
                 />
                 <input
-                  className="border p-2 w-full rounded-lg"
+                  className="border p-2 w-full rounded-lg text-gray-900 text-base"
                   placeholder="Email"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
                 />
                 <input
-                  className="border p-2 w-full rounded-lg"
+                  className="border p-2 w-full rounded-lg text-gray-900 text-base"
                   placeholder="Locație (oraș/adresă)"
                   value={form.address}
                   onChange={(e) => setForm({ ...form, address: e.target.value })}
                 />
                 <input
-                  className="border p-2 w-full rounded-lg"
+                  className="border p-2 w-full rounded-lg text-gray-900 text-base"
                   placeholder="Cod montaj"
                   value={form.codMontaj}
                   onChange={(e) => setForm({ ...form, codMontaj: e.target.value })}
@@ -195,13 +195,13 @@ export default function ClientsPage() {
                   </label>
                   <input
                     type="date"
-                    className="border p-2 w-full rounded-lg"
+                    className="border p-2 w-full rounded-lg text-gray-900 text-base"
                     value={form.dataMontaj}
                     onChange={(e) => setForm({ ...form, dataMontaj: e.target.value })}
                   />
                 </div>
                 <select
-                  className="border p-2 w-full rounded-lg"
+                  className="border p-2 w-full rounded-lg text-gray-900 text-base"
                   value={form.statusMontaj}
                   onChange={(e) => setForm({ ...form, statusMontaj: e.target.value })}
                 >
@@ -210,7 +210,7 @@ export default function ClientsPage() {
                   <option value="Anulat">Anulat</option>
                 </select>
                 <select
-                  className="border p-2 w-full rounded-lg"
+                  className="border p-2 w-full rounded-lg text-gray-900 text-base"
                   value={form.status}
                   onChange={(e) => setForm({ ...form, status: e.target.value })}
                 >
@@ -219,7 +219,7 @@ export default function ClientsPage() {
                   <option value="Inactiv">Inactiv</option>
                 </select>
                 <textarea
-                  className="border p-2 w-full rounded-lg"
+                  className="border p-2 w-full rounded-lg text-gray-900 text-base"
                   placeholder="Observații"
                   rows={3}
                   value={form.observatii}
@@ -251,7 +251,7 @@ export default function ClientsPage() {
 
         {/* SEARCH */}
         <input
-          className="border p-2 w-full mb-4 rounded-lg"
+          className="border p-2 w-full mb-4 rounded-lg text-gray-900 text-base"
           placeholder="Caută după nume, telefon, email, cod montaj..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -259,34 +259,34 @@ export default function ClientsPage() {
 
         {/* TABLE */}
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
+          <table className="w-full border-collapse text-sm" style={{ fontFamily: "inherit" }}>
             <thead>
               <tr className="bg-gray-100">
-                <th className="border p-2 text-left">Nume</th>
-                <th className="border p-2 text-left">Telefon</th>
-                <th className="border p-2 text-left">Locație</th>
-                <th className="border p-2 text-left">Cod montaj</th>
-                <th className="border p-2 text-left">Data montaj</th>
-                <th className="border p-2 text-left">Status montaj</th>
-                <th className="border p-2 text-left">Status</th>
-                <th className="border p-2 text-left">Acțiuni</th>
+                <th className="border p-2 text-left text-gray-900">Nume</th>
+                <th className="border p-2 text-left text-gray-900">Telefon</th>
+                <th className="border p-2 text-left text-gray-900">Locație</th>
+                <th className="border p-2 text-left text-gray-900">Cod montaj</th>
+                <th className="border p-2 text-left text-gray-900">Data montaj</th>
+                <th className="border p-2 text-left text-gray-900">Status montaj</th>
+                <th className="border p-2 text-left text-gray-900">Status</th>
+                <th className="border p-2 text-left text-gray-900">Acțiuni</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((client) => (
                 <tr key={client.id} className="hover:bg-gray-50">
-                  <td className="border p-2 font-medium">{client.name}</td>
-                  <td className="border p-2">{client.phone || "-"}</td>
-                  <td className="border p-2">{client.address || "-"}</td>
-                  <td className="border p-2">{client.cod_montaj || "-"}</td>
-                  <td className="border p-2">
+                  <td className="border p-2 font-medium text-gray-900">{client.name}</td>
+                  <td className="border p-2 text-gray-900">{client.phone || "-"}</td>
+                  <td className="border p-2 text-gray-900">{client.address || "-"}</td>
+                  <td className="border p-2 text-gray-900">{client.cod_montaj || "-"}</td>
+                  <td className="border p-2 text-gray-900">
                     {client.data_montaj
                       ? new Date(client.data_montaj).toLocaleDateString("ro-RO")
                       : "-"}
                   </td>
                   <td className="border p-2">
                     <span
-                      className={`px-2 py-1 rounded text-xs ${
+                      className={`px-2 py-1 rounded text-xs font-medium ${
                         client.status_montaj === "Efectuat"
                           ? "bg-green-100 text-green-800"
                           : client.status_montaj === "Anulat"
@@ -299,7 +299,7 @@ export default function ClientsPage() {
                   </td>
                   <td className="border p-2">
                     <span
-                      className={`px-2 py-1 rounded text-xs ${
+                      className={`px-2 py-1 rounded text-xs font-medium ${
                         client.status === "Activ"
                           ? "bg-green-100 text-green-800"
                           : client.status === "Lead"
@@ -313,13 +313,13 @@ export default function ClientsPage() {
                   <td className="border p-2">
                     <button
                       onClick={() => startEdit(client)}
-                      className="text-blue-600 mr-3 text-xs"
+                      className="text-blue-600 mr-3 text-xs font-medium"
                     >
                       Editează
                     </button>
                     <button
                       onClick={() => deleteClient(client.id)}
-                      className="text-red-600 text-xs"
+                      className="text-red-600 text-xs font-medium"
                     >
                       Șterge
                     </button>
