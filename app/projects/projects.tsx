@@ -9,7 +9,7 @@ import AuthGuard from "@/components/AuthGuard";
 import { supabase } from "@/lib/supabase";
 import ImageLightbox from "@/components/ImageLightbox";
 
-const ADMIN_EMAIL = "catalinvalentin01@gmail.com";
+const SUPER_ADMIN = "catalinvalentin01@gmail.com";
 
 type Project = {
   id?: string;
@@ -60,7 +60,7 @@ type MontajImage = {
 export default function ProjectsPage() {
   const [events, setEvents] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false); // super admin SAU admin
 
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -114,10 +114,26 @@ export default function ProjectsPage() {
     status: "Programat", roof_images: [], simulation_images: [],
   });
 
+  // ── AUTH: verifică dacă userul e super admin sau admin ──────
   useEffect(() => {
     const check = async () => {
       const { data } = await supabase.auth.getUser();
-      setIsAdmin(data.user?.email === ADMIN_EMAIL);
+      if (!data.user) return;
+
+      // Super adminul e mereu admin
+      if (data.user.email === SUPER_ADMIN) {
+        setIsAdmin(true);
+        return;
+      }
+
+      // Verifică is_admin în user_access
+      const { data: access } = await supabase
+        .from("user_access")
+        .select("is_admin")
+        .eq("email", data.user.email)
+        .single();
+
+      setIsAdmin(access?.is_admin === true);
     };
     check();
   }, []);
@@ -334,6 +350,93 @@ export default function ProjectsPage() {
     win.print();
   };
 
+  const handleDownloadPDF = () => {
+    // Folosim jsPDF
+    import("jspdf").then(({ jsPDF }) => {
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
+      const margin = 15;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const colWidths = [10, 100, 25, 35]; // #, Material, U.M., Cantitate
+      const tableWidth = colWidths.reduce((a, b) => a + b, 0);
+      const startX = (pageWidth - tableWidth) / 2;
+
+      // Titlu
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.text(`Lista materiale — ${form.client || "—"}`, margin, 20);
+
+      // Subtitlu
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text(
+        `Proiect: ${form.title || "—"}   |   Locație: ${form.location || "—"}   |   Data: ${selectedDate || "—"}`,
+        margin, 28
+      );
+      doc.setTextColor(0);
+
+      // Header tabel
+      let y = 38;
+      const rowH = 9;
+      const headers = ["#", "Material", "U.M.", "Cantitate"];
+
+      doc.setFillColor(243, 244, 246);
+      doc.rect(startX, y, tableWidth, rowH, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      let x = startX;
+      headers.forEach((h, i) => {
+        doc.text(h, x + 2, y + 6);
+        x += colWidths[i];
+      });
+
+      // Linii tabel
+      doc.setFont("helvetica", "normal");
+      materials.forEach((mat, idx) => {
+        y += rowH;
+
+        // Fundal alternativ
+        if (idx % 2 === 1) {
+          doc.setFillColor(249, 250, 251);
+          doc.rect(startX, y, tableWidth, rowH, "F");
+        }
+
+        const qty = quantities[mat.id] || "—";
+        const row = [`${idx + 1}`, mat.name, mat.unit, qty];
+        x = startX;
+        doc.setFontSize(10);
+        row.forEach((cell, i) => {
+          // Cantitate bold dacă există
+          if (i === 3 && quantities[mat.id]) {
+            doc.setFont("helvetica", "bold");
+          } else {
+            doc.setFont("helvetica", "normal");
+          }
+          // Trunchiază textul lung
+          const maxW = colWidths[i] - 4;
+          const truncated = doc.getTextWidth(cell) > maxW
+            ? cell.substring(0, Math.floor(cell.length * maxW / doc.getTextWidth(cell)) - 2) + "…"
+            : cell;
+          doc.text(truncated, x + 2, y + 6);
+          x += colWidths[i];
+        });
+
+        // Borduri rând
+        doc.setDrawColor(229, 231, 235);
+        doc.rect(startX, y, tableWidth, rowH);
+      });
+
+      // Bordură header
+      doc.setDrawColor(209, 213, 219);
+      doc.rect(startX, 38, tableWidth, rowH);
+
+      // Salvează
+      const fileName = `materiale-${(form.client || "proiect").replace(/\s+/g, "-").toLowerCase()}-${selectedDate || "fara-data"}.pdf`;
+      doc.save(fileName);
+    });
+  };
+
   // ── POZE MONTAJ ──────────────────────────────────────────────
 
   const handleAddCategory = async () => {
@@ -363,7 +466,6 @@ export default function ProjectsPage() {
     await loadMontajCategories();
   };
 
-  // Salvează ordinea în DB
   const saveOrderToDB = async (reordered: MontajCategory[]) => {
     const updates = reordered.map((cat, idx) =>
       supabase.from("montaj_categories").update({ order_index: idx + 1 }).eq("id", cat.id)
@@ -371,7 +473,6 @@ export default function ProjectsPage() {
     await Promise.all(updates);
   };
 
-  // Mută cu butoane ↑ ↓
   const moveCategoryUp = async (index: number) => {
     if (index === 0) return;
     const reordered = [...montajCategories];
@@ -388,10 +489,7 @@ export default function ProjectsPage() {
     await saveOrderToDB(reordered);
   };
 
-  // Drag & drop handlers
-  const handleDragStart = (categoryId: string) => {
-    dragCatRef.current = categoryId;
-  };
+  const handleDragStart = (categoryId: string) => { dragCatRef.current = categoryId; };
 
   const handleDragOver = (e: React.DragEvent, categoryId: string) => {
     e.preventDefault();
@@ -402,13 +500,11 @@ export default function ProjectsPage() {
     const dragId = dragCatRef.current;
     const overId = dragOverCatRef.current;
     if (!dragId || !overId || dragId === overId) return;
-
     const reordered = [...montajCategories];
     const fromIdx = reordered.findIndex((c) => c.id === dragId);
     const toIdx = reordered.findIndex((c) => c.id === overId);
     const [moved] = reordered.splice(fromIdx, 1);
     reordered.splice(toIdx, 0, moved);
-
     setMontajCategories(reordered);
     dragCatRef.current = null;
     dragOverCatRef.current = null;
@@ -667,7 +763,6 @@ export default function ProjectsPage() {
                   {showMontaj && (
                     <div className="p-2 mt-1">
 
-                      {/* Admin: adaugă categorie nouă */}
                       {isAdmin && (
                         <div className="flex gap-2 mb-4">
                           <input
@@ -708,15 +803,10 @@ export default function ProjectsPage() {
                                 onDragLeave={(e) => (e.currentTarget as HTMLElement).classList.remove("drag-over")}
                                 onDrop={(e) => { (e.currentTarget as HTMLElement).classList.remove("drag-over"); handleDrop(); }}
                               >
-                                {/* Header categorie */}
                                 <div className="flex items-center bg-gray-50 px-3 py-2 gap-2">
-
-                                  {/* Drag handle (admin) */}
                                   {isAdmin && (
                                     <span className="text-gray-300 cursor-grab active:cursor-grabbing text-lg select-none shrink-0" title="Trage pentru a reordona">⠿</span>
                                   )}
-
-                                  {/* Nume — mod editare sau normal */}
                                   {isAdmin && isEditingThis ? (
                                     <div className="flex items-center gap-2 flex-1 min-w-0">
                                       <input
@@ -739,37 +829,16 @@ export default function ProjectsPage() {
                                       <span className="text-gray-400 text-xs ml-auto shrink-0">{isCollapsed ? "▼" : "▲"}</span>
                                     </button>
                                   )}
-
-                                  {/* Butoane admin: ↑ ↓ ✏️ ✕ */}
                                   {isAdmin && !isEditingThis && (
                                     <div className="flex items-center gap-1 shrink-0 ml-1">
-                                      <button
-                                        className="text-gray-400 hover:text-gray-700 font-bold px-1 disabled:opacity-20"
-                                        onClick={() => moveCategoryUp(catIndex)}
-                                        disabled={catIndex === 0}
-                                        title="Mută sus"
-                                      >↑</button>
-                                      <button
-                                        className="text-gray-400 hover:text-gray-700 font-bold px-1 disabled:opacity-20"
-                                        onClick={() => moveCategoryDown(catIndex)}
-                                        disabled={catIndex === montajCategories.length - 1}
-                                        title="Mută jos"
-                                      >↓</button>
-                                      <button
-                                        className="text-blue-400 hover:text-blue-600 text-sm font-bold px-1"
-                                        onClick={() => { setEditingCategoryId(cat.id); setEditingCategoryName(cat.name); }}
-                                        title="Editează numele"
-                                      >✏️</button>
-                                      <button
-                                        className="text-red-400 hover:text-red-600 text-sm font-bold px-1"
-                                        onClick={() => handleDeleteCategory(cat.id)}
-                                        title="Șterge categoria"
-                                      >✕</button>
+                                      <button className="text-gray-400 hover:text-gray-700 font-bold px-1 disabled:opacity-20" onClick={() => moveCategoryUp(catIndex)} disabled={catIndex === 0} title="Mută sus">↑</button>
+                                      <button className="text-gray-400 hover:text-gray-700 font-bold px-1 disabled:opacity-20" onClick={() => moveCategoryDown(catIndex)} disabled={catIndex === montajCategories.length - 1} title="Mută jos">↓</button>
+                                      <button className="text-blue-400 hover:text-blue-600 text-sm font-bold px-1" onClick={() => { setEditingCategoryId(cat.id); setEditingCategoryName(cat.name); }} title="Editează numele">✏️</button>
+                                      <button className="text-red-400 hover:text-red-600 text-sm font-bold px-1" onClick={() => handleDeleteCategory(cat.id)} title="Șterge categoria">✕</button>
                                     </div>
                                   )}
                                 </div>
 
-                                {/* Continut categorie */}
                                 {!isCollapsed && (
                                   <div className="p-3">
                                     {!montajSaved && (
@@ -784,7 +853,6 @@ export default function ProjectsPage() {
                                         />
                                       </label>
                                     )}
-
                                     {catImages.length === 0 ? (
                                       <p className="text-xs text-gray-400 italic">Nu există poze în această categorie.</p>
                                     ) : (
@@ -820,7 +888,6 @@ export default function ProjectsPage() {
                         </div>
                       )}
 
-                      {/* Butoane Salvează / Deblochează */}
                       <div className="mt-4 flex flex-wrap gap-2 items-center">
                         {!montajSaved && (
                           <button className="bg-blue-600 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-blue-700 transition" onClick={handleSaveMontaj}>
@@ -915,12 +982,20 @@ export default function ProjectsPage() {
                             </button>
                           )}
                           {isAdmin && (
-                            <button
-                              className="bg-gray-700 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-gray-800 transition"
-                              onClick={handlePrintMaterials}
-                            >
-                              🖨️ Printează materiale
-                            </button>
+                            <>
+                              <button
+                                className="bg-gray-700 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-gray-800 transition"
+                                onClick={handlePrintMaterials}
+                              >
+                                🖨️ Printează
+                              </button>
+                              <button
+                                className="bg-green-700 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-green-800 transition"
+                                onClick={handleDownloadPDF}
+                              >
+                                ⬇️ Descarcă PDF
+                              </button>
+                            </>
                           )}
                         </div>
                       )}
