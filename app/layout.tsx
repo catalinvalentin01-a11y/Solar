@@ -12,17 +12,32 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   const [email, setEmail] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const router = useRouter();
+
+  const checkAdmin = async (userEmail: string) => {
+    const { data } = await supabase
+      .from("user_access")
+      .select("is_admin")
+      .eq("email", userEmail)
+      .single();
+    setIsAdmin(data?.is_admin === true);
+  };
 
   useEffect(() => {
     const getUser = async () => {
       const { data } = await supabase.auth.getUser();
-      setEmail(data.user?.email ?? null);
+      const userEmail = data.user?.email ?? null;
+      setEmail(userEmail);
+      if (userEmail) checkAdmin(userEmail);
     };
     getUser();
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setEmail(session?.user?.email ?? null);
+      const userEmail = session?.user?.email ?? null;
+      setEmail(userEmail);
+      if (userEmail) checkAdmin(userEmail);
+      else setIsAdmin(false);
     });
 
     return () => listener.subscription.unsubscribe();
@@ -54,6 +69,16 @@ export default function RootLayout({
             <Link href="/projects" className="block hover:text-gray-300">
               Proiecte
             </Link>
+
+            {/* Buton Admin — vizibil doar pentru admini */}
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className="block mt-4 bg-yellow-500 hover:bg-yellow-400 text-gray-900 text-sm font-semibold px-3 py-2 rounded text-center transition"
+              >
+                ⚙️ Admin
+              </Link>
+            )}
           </nav>
 
           {/* USER INFO / LOGIN */}
