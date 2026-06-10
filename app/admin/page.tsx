@@ -58,7 +58,6 @@ export default function AdminPage() {
   };
 
   const toggleAdmin = async (id: string, currentValue: boolean, email: string) => {
-    // Protecție: super-adminul nu poate fi scos
     if (email === SUPER_ADMIN) return;
     await supabase
       .from("user_access")
@@ -69,7 +68,7 @@ export default function AdminPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen text-gray-500">
+      <div className="flex items-center justify-center h-screen text-gray-500" style={{ fontFamily: "inherit" }}>
         Se încarcă...
       </div>
     );
@@ -81,12 +80,12 @@ export default function AdminPage() {
   const admins = requests.filter((r) => r.is_admin);
 
   return (
-    <div className="max-w-2xl mx-auto p-6 flex flex-col gap-8">
-      <h1 className="text-2xl font-bold">⚙️ Panou administrator</h1>
+    <div className="max-w-2xl mx-auto p-6 flex flex-col gap-8" style={{ fontFamily: "inherit" }}>
+      <h1 className="text-2xl font-bold text-gray-900">⚙️ Panou administrator</h1>
 
       {/* CERERI ÎN AȘTEPTARE */}
       <section>
-        <h2 className="text-lg font-semibold mb-3">
+        <h2 className="text-lg font-semibold mb-3 text-gray-900">
           Cereri în așteptare ({pending.length})
         </h2>
         {pending.length === 0 ? (
@@ -96,7 +95,7 @@ export default function AdminPage() {
             {pending.map((r) => (
               <div key={r.id} className="flex items-center justify-between border rounded-xl p-4">
                 <div>
-                  <p className="font-medium">{r.email}</p>
+                  <p className="font-medium text-gray-900">{r.email}</p>
                   <p className="text-sm text-gray-400">
                     {new Date(r.created_at).toLocaleDateString("ro-RO")}
                   </p>
@@ -104,13 +103,13 @@ export default function AdminPage() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => updateStatus(r.id, "approved")}
-                    className="bg-green-500 text-white px-4 py-1.5 rounded-lg text-sm"
+                    className="bg-green-500 text-white px-4 py-1.5 rounded-lg text-sm font-medium"
                   >
                     Aprobă
                   </button>
                   <button
                     onClick={() => updateStatus(r.id, "rejected")}
-                    className="bg-red-500 text-white px-4 py-1.5 rounded-lg text-sm"
+                    className="bg-red-500 text-white px-4 py-1.5 rounded-lg text-sm font-medium"
                   >
                     Respinge
                   </button>
@@ -124,14 +123,14 @@ export default function AdminPage() {
       {/* ADMINI — doar super-adminul vede și poate modifica */}
       {isSuperAdmin && (
         <section>
-          <h2 className="text-lg font-semibold mb-3">
+          <h2 className="text-lg font-semibold mb-3 text-gray-900">
             Administratori ({admins.length})
           </h2>
           <div className="flex flex-col gap-3">
             {admins.map((r) => (
               <div key={r.id} className="flex items-center justify-between border border-yellow-300 bg-yellow-50 rounded-xl p-4">
                 <div>
-                  <p className="font-medium">{r.email}</p>
+                  <p className="font-medium text-gray-900">{r.email}</p>
                   {r.email === SUPER_ADMIN && (
                     <p className="text-xs text-yellow-600">Super admin</p>
                   )}
@@ -139,7 +138,7 @@ export default function AdminPage() {
                 {r.email !== SUPER_ADMIN && (
                   <button
                     onClick={() => toggleAdmin(r.id, r.is_admin, r.email)}
-                    className="bg-red-500 text-white px-3 py-1.5 rounded-lg text-sm"
+                    className="bg-red-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium"
                   >
                     Șterge admin
                   </button>
@@ -149,13 +148,13 @@ export default function AdminPage() {
           </div>
 
           {/* Promovează un user la admin */}
-          <h3 className="text-md font-semibold mt-5 mb-3">Adaugă admin din utilizatori aprobați</h3>
+          <h3 className="text-md font-semibold mt-5 mb-3 text-gray-900">Adaugă admin din utilizatori aprobați</h3>
           <div className="flex flex-col gap-3">
             {approved
               .filter((r) => !r.is_admin)
               .map((r) => (
                 <div key={r.id} className="flex items-center justify-between border rounded-xl p-4">
-                  <p className="font-medium">{r.email}</p>
+                  <p className="font-medium text-gray-900">{r.email}</p>
                   <button
                     onClick={() => toggleAdmin(r.id, r.is_admin, r.email)}
                     className="bg-yellow-500 text-gray-900 px-3 py-1.5 rounded-lg text-sm font-semibold"
@@ -173,14 +172,14 @@ export default function AdminPage() {
 
       {/* TOȚI UTILIZATORII */}
       <section>
-        <h2 className="text-lg font-semibold mb-3">
+        <h2 className="text-lg font-semibold mb-3 text-gray-900">
           Utilizatori aprobați ({approved.length})
         </h2>
         <div className="flex flex-col gap-3">
           {approved.map((r) => (
             <div key={r.id} className="flex items-center justify-between border rounded-xl p-4">
               <div>
-                <p className="font-medium">{r.email}</p>
+                <p className="font-medium text-gray-900">{r.email}</p>
                 {r.is_admin && <p className="text-xs text-yellow-600">Admin</p>}
               </div>
               <button
@@ -200,7 +199,7 @@ export default function AdminPage() {
       {/* RESPINSI */}
       {rejected.length > 0 && (
         <section>
-          <h2 className="text-lg font-semibold mb-3">
+          <h2 className="text-lg font-semibold mb-3 text-gray-900">
             Respinși ({rejected.length})
           </h2>
           <div className="flex flex-col gap-3">
