@@ -360,31 +360,29 @@ export default function ProjectsPage() {
     [selectedProject]
   );
 
-  // FIX: Nu mai apelăm loadProjectMaterials după save — setăm direct state-ul
   const handleSaveMaterials = async () => {
     if (!selectedProject?.id) return;
 
-    for (const material of materials) {
-      const qty = quantities[material.id] || "";
-      const existing = projectMaterials.find((pm) => pm.material_id === material.id);
+    const upsertData = materials.map((material) => ({
+      project_id: selectedProject.id!,
+      material_id: material.id,
+      quantity: quantities[material.id] || "",
+      saved: true,
+      saved_at: new Date().toISOString(),
+    }));
 
-      if (existing?.id) {
-        await supabase
-          .from("project_materials")
-          .update({ quantity: qty, saved: true, saved_at: new Date().toISOString() })
-          .eq("id", existing.id);
-      } else {
-        await supabase.from("project_materials").insert({
-          project_id: selectedProject.id,
-          material_id: material.id,
-          quantity: qty,
-          saved: true,
-          saved_at: new Date().toISOString(),
-        });
-      }
+    const { error } = await supabase
+      .from("project_materials")
+      .upsert(upsertData, {
+        onConflict: "project_id,material_id",
+      });
+
+    if (error) {
+      console.error("Eroare la salvare materiale:", error);
+      alert("Eroare la salvare: " + error.message);
+      return;
     }
 
-    // FIX: Setăm direct saved=true fără a re-incarca din DB (care ar putea reseta starea)
     setMaterialsSaved(true);
     setProjectMaterials((prev) =>
       prev.map((pm) => ({ ...pm, saved: true }))
