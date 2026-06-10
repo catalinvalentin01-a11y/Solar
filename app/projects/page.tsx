@@ -46,6 +46,7 @@ type ProjectMaterial = {
 type MontajCategory = {
   id: string;
   name: string;
+  order_index: number;
 };
 
 type MontajImage = {
@@ -87,7 +88,6 @@ export default function ProjectsPage() {
   const [autoSaving, setAutoSaving] = useState(false);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Editare material în lista globală
   const [editingMaterialId, setEditingMaterialId] = useState<string | null>(null);
   const [editingMaterialName, setEditingMaterialName] = useState("");
   const [editingMaterialUnit, setEditingMaterialUnit] = useState("");
@@ -98,105 +98,71 @@ export default function ProjectsPage() {
   const [montajSaved, setMontajSaved] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [uploadingCategory, setUploadingCategory] = useState<string | null>(null);
-  // stare colaps per categorie
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
 
+  // Editare categorie
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState("");
+
+  // Drag & drop
+  const dragCatRef = useRef<string | null>(null);
+  const dragOverCatRef = useRef<string | null>(null);
+
   const [form, setForm] = useState<Project>({
-    client: "",
-    phone: "",
-    email: "",
-    title: "",
-    location: "",
-    kw: "",
-    battery: "",
-    panels: "",
-    inverter: "",
-    notes: "",
-    status: "Programat",
-    roof_images: [],
-    simulation_images: [],
+    client: "", phone: "", email: "", title: "", location: "",
+    kw: "", battery: "", panels: "", inverter: "", notes: "",
+    status: "Programat", roof_images: [], simulation_images: [],
   });
 
   useEffect(() => {
     const check = async () => {
       const { data } = await supabase.auth.getUser();
-      const email = data.user?.email;
-      setIsAdmin(email === ADMIN_EMAIL);
+      setIsAdmin(data.user?.email === ADMIN_EMAIL);
     };
     check();
   }, []);
 
   async function loadProjects() {
-    const { data, error } = await supabase
-      .from("projects")
-      .select("*")
-      .order("date", { ascending: true });
-
+    const { data, error } = await supabase.from("projects").select("*").order("date", { ascending: true });
     if (error) { console.error(error); return; }
-
-    const calendarEvents = (data || []).map((project) => ({
-      id: project.id,
-      title: `${project.client} - ${project.title}`,
-      start: project.date,
+    setEvents((data || []).map((p) => ({
+      id: p.id,
+      title: `${p.client} - ${p.title}`,
+      start: p.date,
       allDay: true,
-      extendedProps: project,
-    }));
-
-    setEvents([...calendarEvents]);
+      extendedProps: p,
+    })));
   }
 
   async function loadMaterials() {
-    const { data, error } = await supabase
-      .from("materials")
-      .select("*")
-      .order("created_at", { ascending: true });
-
+    const { data, error } = await supabase.from("materials").select("*").order("created_at", { ascending: true });
     if (error) { console.error(error); return; }
     setMaterials(data || []);
   }
 
   async function loadProjectMaterials(projectId: string) {
-    const { data, error } = await supabase
-      .from("project_materials")
-      .select("*")
-      .eq("project_id", projectId);
-
+    const { data, error } = await supabase.from("project_materials").select("*").eq("project_id", projectId);
     if (error) { console.error(error); return; }
-
     const rows = data || [];
     setProjectMaterials(rows);
-
     const q: Record<string, string> = {};
     rows.forEach((row) => { q[row.material_id] = row.quantity || ""; });
     setQuantities(q);
-
-    const anySaved = rows.some((r) => r.saved === true);
-    setMaterialsSaved(anySaved);
+    setMaterialsSaved(rows.some((r) => r.saved === true));
   }
 
   async function loadMontajCategories() {
-    const { data, error } = await supabase
-      .from("montaj_categories")
-      .select("*")
-      .order("created_at", { ascending: true });
-
+    const { data, error } = await supabase.from("montaj_categories").select("*").order("order_index", { ascending: true });
     if (error) { console.error(error); return; }
     setMontajCategories(data || []);
   }
 
   async function loadMontajImages(projectId: string) {
-    const { data, error } = await supabase
-      .from("montaj_images")
-      .select("*")
-      .eq("project_id", projectId);
-
+    const { data, error } = await supabase.from("montaj_images").select("*").eq("project_id", projectId);
     if (error) { console.error(error); return; }
-
     const rows = data || [];
     setMontajImages(rows);
-
-    const anySaved = rows.some((r) => r.saved === true);
-    setMontajSaved(anySaved);
+    setMontajSaved(rows.some((r) => r.saved === true));
   }
 
   useEffect(() => {
@@ -206,11 +172,7 @@ export default function ProjectsPage() {
   }, []);
 
   const resetForm = () => {
-    setForm({
-      client: "", phone: "", email: "", title: "", location: "",
-      kw: "", battery: "", panels: "", inverter: "", notes: "",
-      status: "Programat", roof_images: [], simulation_images: [],
-    });
+    setForm({ client: "", phone: "", email: "", title: "", location: "", kw: "", battery: "", panels: "", inverter: "", notes: "", status: "Programat", roof_images: [], simulation_images: [] });
     setSelectedProject(null);
     setSelectedDate(null);
     setProjectMaterials([]);
@@ -220,15 +182,12 @@ export default function ProjectsPage() {
     setMontajSaved(false);
     setOpen(false);
     setEditingMaterialId(null);
+    setEditingCategoryId(null);
     setCollapsedCategories({});
   };
 
   const handleSave = async () => {
-    const { error } = await supabase
-      .from("projects")
-      .insert({ ...form, date: selectedDate })
-      .select();
-
+    const { error } = await supabase.from("projects").insert({ ...form, date: selectedDate }).select();
     if (error) { alert(error.message); return; }
     resetForm();
     await loadProjects();
@@ -236,18 +195,12 @@ export default function ProjectsPage() {
 
   const handleUpdate = async () => {
     if (!selectedProject?.id) return;
-
-    const { error } = await supabase
-      .from("projects")
-      .update({
-        client: form.client, phone: form.phone, email: form.email,
-        title: form.title, location: form.location, kw: form.kw,
-        battery: form.battery, panels: form.panels, inverter: form.inverter,
-        notes: form.notes, status: form.status,
-        roof_images: form.roof_images, simulation_images: form.simulation_images,
-      })
-      .eq("id", selectedProject.id);
-
+    const { error } = await supabase.from("projects").update({
+      client: form.client, phone: form.phone, email: form.email, title: form.title,
+      location: form.location, kw: form.kw, battery: form.battery, panels: form.panels,
+      inverter: form.inverter, notes: form.notes, status: form.status,
+      roof_images: form.roof_images, simulation_images: form.simulation_images,
+    }).eq("id", selectedProject.id);
     if (error) { console.error(error); return; }
     await loadProjects();
     resetForm();
@@ -255,14 +208,8 @@ export default function ProjectsPage() {
 
   const handleDelete = async () => {
     if (!selectedProject?.id) return;
-    const ok = confirm("Sigur dorești ștergerea proiectului?");
-    if (!ok) return;
-
-    const { error } = await supabase
-      .from("projects")
-      .delete()
-      .eq("id", selectedProject.id);
-
+    if (!confirm("Sigur dorești ștergerea proiectului?")) return;
+    const { error } = await supabase.from("projects").delete().eq("id", selectedProject.id);
     if (error) { console.error(error); return; }
     await loadProjects();
     resetForm();
@@ -273,45 +220,23 @@ export default function ProjectsPage() {
   const handleAddMaterial = async () => {
     const name = newMaterialName.trim();
     if (!name) return;
-
     const { error } = await supabase.from("materials").insert({ name, unit: newMaterialUnit });
     if (error) { alert(error.message); return; }
-
-    setNewMaterialName("");
-    setNewMaterialUnit("buc");
+    setNewMaterialName(""); setNewMaterialUnit("buc");
     await loadMaterials();
   };
 
   const handleDeleteMaterial = async (materialId: string) => {
-    const ok = confirm("Ștergi materialul din listă?");
-    if (!ok) return;
-
+    if (!confirm("Ștergi materialul din listă?")) return;
     const { error } = await supabase.from("materials").delete().eq("id", materialId);
     if (error) { alert(error.message); return; }
     await loadMaterials();
   };
 
-  const handleStartEditMaterial = (mat: Material) => {
-    setEditingMaterialId(mat.id);
-    setEditingMaterialName(mat.name);
-    setEditingMaterialUnit(mat.unit);
-  };
-
-  const handleCancelEditMaterial = () => {
-    setEditingMaterialId(null);
-    setEditingMaterialName("");
-    setEditingMaterialUnit("");
-  };
-
   const handleSaveEditMaterial = async (materialId: string) => {
     const name = editingMaterialName.trim();
     if (!name) return;
-
-    const { error } = await supabase
-      .from("materials")
-      .update({ name, unit: editingMaterialUnit })
-      .eq("id", materialId);
-
+    const { error } = await supabase.from("materials").update({ name, unit: editingMaterialUnit }).eq("id", materialId);
     if (error) { alert(error.message); return; }
     setEditingMaterialId(null);
     await loadMaterials();
@@ -321,24 +246,15 @@ export default function ProjectsPage() {
     async (materialId: string, value: string, currentProjectMaterials: ProjectMaterial[]) => {
       if (!selectedProject?.id) return;
       setAutoSaving(true);
-
       const existing = currentProjectMaterials.find((pm) => pm.material_id === materialId);
-
       if (existing?.id) {
-        await supabase
-          .from("project_materials")
-          .update({ quantity: value, saved: false })
-          .eq("id", existing.id);
+        await supabase.from("project_materials").update({ quantity: value, saved: false }).eq("id", existing.id);
       } else {
-        const { data } = await supabase
-          .from("project_materials")
+        const { data } = await supabase.from("project_materials")
           .insert({ project_id: selectedProject.id, material_id: materialId, quantity: value, saved: false })
-          .select()
-          .single();
-
+          .select().single();
         if (data) setProjectMaterials((prev) => [...prev, data]);
       }
-
       setAutoSaving(false);
     },
     [selectedProject]
@@ -346,33 +262,19 @@ export default function ProjectsPage() {
 
   const handleSaveMaterials = async () => {
     if (!selectedProject?.id) return;
-
-    const upsertData = materials.map((material) => ({
-      project_id: selectedProject.id!,
-      material_id: material.id,
-      quantity: quantities[material.id] || "",
-      saved: true,
-      saved_at: new Date().toISOString(),
+    const upsertData = materials.map((m) => ({
+      project_id: selectedProject.id!, material_id: m.id,
+      quantity: quantities[m.id] || "", saved: true, saved_at: new Date().toISOString(),
     }));
-
-    const { error } = await supabase
-      .from("project_materials")
-      .upsert(upsertData, { onConflict: "project_id,material_id" });
-
+    const { error } = await supabase.from("project_materials").upsert(upsertData, { onConflict: "project_id,material_id" });
     if (error) { alert("Eroare la salvare: " + error.message); return; }
-
     setMaterialsSaved(true);
     setProjectMaterials((prev) => prev.map((pm) => ({ ...pm, saved: true })));
   };
 
   const handleUnlockMaterials = async () => {
     if (!selectedProject?.id) return;
-
-    await supabase
-      .from("project_materials")
-      .update({ saved: false, saved_at: null })
-      .eq("project_id", selectedProject.id);
-
+    await supabase.from("project_materials").update({ saved: false, saved_at: null }).eq("project_id", selectedProject.id);
     setMaterialsSaved(false);
     setProjectMaterials((prev) => prev.map((pm) => ({ ...pm, saved: false })));
   };
@@ -382,44 +284,95 @@ export default function ProjectsPage() {
   const handleAddCategory = async () => {
     const name = newCategoryName.trim();
     if (!name) return;
-
-    const { error } = await supabase.from("montaj_categories").insert({ name });
+    const maxOrder = montajCategories.reduce((max, c) => Math.max(max, c.order_index || 0), 0);
+    const { error } = await supabase.from("montaj_categories").insert({ name, order_index: maxOrder + 1 });
     if (error) { alert(error.message); return; }
-
     setNewCategoryName("");
     await loadMontajCategories();
   };
 
   const handleDeleteCategory = async (categoryId: string) => {
-    const ok = confirm("Ștergi categoria și toate pozele din ea?");
-    if (!ok) return;
-
+    if (!confirm("Ștergi categoria și toate pozele din ea?")) return;
     const { error } = await supabase.from("montaj_categories").delete().eq("id", categoryId);
     if (error) { alert(error.message); return; }
     await loadMontajCategories();
     if (selectedProject?.id) await loadMontajImages(selectedProject.id);
   };
 
+  const handleSaveEditCategory = async (categoryId: string) => {
+    const name = editingCategoryName.trim();
+    if (!name) return;
+    const { error } = await supabase.from("montaj_categories").update({ name }).eq("id", categoryId);
+    if (error) { alert(error.message); return; }
+    setEditingCategoryId(null);
+    await loadMontajCategories();
+  };
+
+  // Salvează ordinea în DB
+  const saveOrderToDB = async (reordered: MontajCategory[]) => {
+    const updates = reordered.map((cat, idx) =>
+      supabase.from("montaj_categories").update({ order_index: idx + 1 }).eq("id", cat.id)
+    );
+    await Promise.all(updates);
+  };
+
+  // Mută cu butoane ↑ ↓
+  const moveCategoryUp = async (index: number) => {
+    if (index === 0) return;
+    const reordered = [...montajCategories];
+    [reordered[index - 1], reordered[index]] = [reordered[index], reordered[index - 1]];
+    setMontajCategories(reordered);
+    await saveOrderToDB(reordered);
+  };
+
+  const moveCategoryDown = async (index: number) => {
+    if (index === montajCategories.length - 1) return;
+    const reordered = [...montajCategories];
+    [reordered[index], reordered[index + 1]] = [reordered[index + 1], reordered[index]];
+    setMontajCategories(reordered);
+    await saveOrderToDB(reordered);
+  };
+
+  // Drag & drop handlers
+  const handleDragStart = (categoryId: string) => {
+    dragCatRef.current = categoryId;
+  };
+
+  const handleDragOver = (e: React.DragEvent, categoryId: string) => {
+    e.preventDefault();
+    dragOverCatRef.current = categoryId;
+  };
+
+  const handleDrop = async () => {
+    const dragId = dragCatRef.current;
+    const overId = dragOverCatRef.current;
+    if (!dragId || !overId || dragId === overId) return;
+
+    const reordered = [...montajCategories];
+    const fromIdx = reordered.findIndex((c) => c.id === dragId);
+    const toIdx = reordered.findIndex((c) => c.id === overId);
+    const [moved] = reordered.splice(fromIdx, 1);
+    reordered.splice(toIdx, 0, moved);
+
+    setMontajCategories(reordered);
+    dragCatRef.current = null;
+    dragOverCatRef.current = null;
+    await saveOrderToDB(reordered);
+  };
+
   const uploadMontajImage = async (file: File, categoryId: string) => {
     if (!selectedProject?.id) return;
     setUploadingCategory(categoryId);
-
     const fileName = `montaj/${Date.now()}-${file.name}`;
     const { error } = await supabase.storage.from("project-images").upload(fileName, file);
     if (error) { console.error(error); setUploadingCategory(null); return; }
-
     const { data } = supabase.storage.from("project-images").getPublicUrl(fileName);
-    const url = data.publicUrl;
-
     const { data: inserted, error: insertError } = await supabase
       .from("montaj_images")
-      .insert({ project_id: selectedProject.id, category_id: categoryId, url, saved: false })
-      .select()
-      .single();
-
+      .insert({ project_id: selectedProject.id, category_id: categoryId, url: data.publicUrl, saved: false })
+      .select().single();
     if (insertError) { console.error(insertError); setUploadingCategory(null); return; }
     if (inserted) setMontajImages((prev) => [...prev, inserted]);
-
     setUploadingCategory(null);
   };
 
@@ -431,29 +384,18 @@ export default function ProjectsPage() {
 
   const handleSaveMontaj = async () => {
     if (!selectedProject?.id) return;
-
-    const ids = montajImages.map((img) => img.id);
-    if (ids.length === 0) { setMontajSaved(true); return; }
-
-    const { error } = await supabase
-      .from("montaj_images")
+    if (montajImages.length === 0) { setMontajSaved(true); return; }
+    const { error } = await supabase.from("montaj_images")
       .update({ saved: true, saved_at: new Date().toISOString() } as any)
       .eq("project_id", selectedProject.id);
-
     if (error) { alert("Eroare la salvare: " + error.message); return; }
-
     setMontajSaved(true);
     setMontajImages((prev) => prev.map((img) => ({ ...img, saved: true })));
   };
 
   const handleUnlockMontaj = async () => {
     if (!selectedProject?.id) return;
-
-    await supabase
-      .from("montaj_images")
-      .update({ saved: false, saved_at: null } as any)
-      .eq("project_id", selectedProject.id);
-
+    await supabase.from("montaj_images").update({ saved: false, saved_at: null } as any).eq("project_id", selectedProject.id);
     setMontajSaved(false);
     setMontajImages((prev) => prev.map((img) => ({ ...img, saved: false })));
   };
@@ -467,17 +409,11 @@ export default function ProjectsPage() {
         roof_images: type === "roof" ? prev.roof_images.filter((img) => img !== imgToDelete) : prev.roof_images,
         simulation_images: type === "simulation" ? prev.simulation_images.filter((img) => img !== imgToDelete) : prev.simulation_images,
       };
-
       if (selectedProject?.id) {
-        supabase.from("projects").update({
-          roof_images: newForm.roof_images,
-          simulation_images: newForm.simulation_images,
-        }).eq("id", selectedProject.id);
+        supabase.from("projects").update({ roof_images: newForm.roof_images, simulation_images: newForm.simulation_images }).eq("id", selectedProject.id);
       }
-
       return newForm;
     });
-
     setLightboxImages((prev) => {
       const filtered = prev.filter((img) => img !== imgToDelete);
       if (filtered.length === 0) { setOpenLightbox(false); return []; }
@@ -489,28 +425,19 @@ export default function ProjectsPage() {
     const fileName = Date.now() + "-" + file.name;
     const { error } = await supabase.storage.from("project-images").upload(fileName, file);
     if (error) { console.error(error); return; }
-
     const { data } = supabase.storage.from("project-images").getPublicUrl(fileName);
-    const url = data.publicUrl;
-
-    if (target === "roof") setForm((prev) => ({ ...prev, roof_images: [...prev.roof_images, url] }));
-    if (target === "simulation") setForm((prev) => ({ ...prev, simulation_images: [...prev.simulation_images, url] }));
+    if (target === "roof") setForm((prev) => ({ ...prev, roof_images: [...prev.roof_images, data.publicUrl] }));
+    if (target === "simulation") setForm((prev) => ({ ...prev, simulation_images: [...prev.simulation_images, data.publicUrl] }));
   };
 
-  const handleCall = (phone: string) => {
-    if (!phone) return;
-    window.location.href = `tel:${phone}`;
-  };
-
+  const handleCall = (phone: string) => { if (phone) window.location.href = `tel:${phone}`; };
   const handleMaps = (location: string) => {
-    if (!location) return;
-    window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`, "_blank");
+    if (location) window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`, "_blank");
   };
 
   return (
     <AuthGuard>
       <div className="p-2 md:p-6">
-
         <style>{`
           .fc { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; font-size: 14px; }
           .fc table { border-collapse: collapse; }
@@ -530,6 +457,7 @@ export default function ProjectsPage() {
             .fc .fc-col-header-cell-cushion { font-size: 11px !important; }
             .fc .fc-event-title { font-size: 11px !important; }
           }
+          .drag-over { outline: 2px dashed #3b82f6; outline-offset: -2px; background: #eff6ff; }
         `}</style>
 
         <div className="overflow-x-auto">
@@ -541,14 +469,9 @@ export default function ProjectsPage() {
             events={events}
             dateClick={(info) => {
               if (!isAdmin) return;
-              setSelectedProject(null);
-              setSelectedDate(info.dateStr);
-              setProjectMaterials([]);
-              setQuantities({});
-              setMaterialsSaved(false);
-              setMontajImages([]);
-              setMontajSaved(false);
-              setOpen(true);
+              setSelectedProject(null); setSelectedDate(info.dateStr);
+              setProjectMaterials([]); setQuantities({}); setMaterialsSaved(false);
+              setMontajImages([]); setMontajSaved(false); setOpen(true);
             }}
             eventClick={(info) => {
               const p = info.event.extendedProps as Project;
@@ -571,31 +494,22 @@ export default function ProjectsPage() {
         {open && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center">
             <div className="fixed inset-0 bg-black/60" onClick={() => setOpen(false)} />
-
             <div className="relative bg-white rounded-lg p-4 w-[95vw] md:w-[900px] max-h-[90vh] overflow-y-auto z-[10000]">
 
               <div className="flex justify-between items-center mb-4">
-                <h2 className="font-bold text-xl text-gray-900">
-                  {selectedProject ? "Detalii proiect" : "Proiect nou"}
-                </h2>
+                <h2 className="font-bold text-xl text-gray-900">{selectedProject ? "Detalii proiect" : "Proiect nou"}</h2>
                 <span className="text-sm font-semibold text-gray-600">{selectedDate}</span>
               </div>
 
               {selectedProject && (
                 <div className="flex flex-wrap gap-3 mb-4">
                   {form.phone && (
-                    <button
-                      className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition text-sm"
-                      onClick={() => handleCall(form.phone)}
-                    >
+                    <button className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition text-sm" onClick={() => handleCall(form.phone)}>
                       📞 Sună — {form.phone}
                     </button>
                   )}
                   {form.location && (
-                    <button
-                      className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition text-sm"
-                      onClick={() => handleMaps(form.location)}
-                    >
+                    <button className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition text-sm" onClick={() => handleMaps(form.location)}>
                       📍 GPS — {form.location}
                     </button>
                   )}
@@ -640,9 +554,7 @@ export default function ProjectsPage() {
                       <input className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500" placeholder="Invertor" value={form.inverter} onChange={(e) => setForm({ ...form, inverter: e.target.value })} />
                       <input className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500" placeholder="Baterie" value={form.battery} onChange={(e) => setForm({ ...form, battery: e.target.value })} />
                       <select className="border border-gray-300 p-3 rounded text-base text-gray-900" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-                        <option>Programat</option>
-                        <option>În lucru</option>
-                        <option>Finalizat</option>
+                        <option>Programat</option><option>În lucru</option><option>Finalizat</option>
                       </select>
                       <textarea className="border border-gray-300 p-3 rounded col-span-1 sm:col-span-2 text-base text-gray-900 placeholder-gray-500" placeholder="Observații" rows={4} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
                     </>
@@ -666,14 +578,10 @@ export default function ProjectsPage() {
               </button>
               {showRoof && (
                 <div className="p-2 mt-1">
-                  {isAdmin && (
-                    <input type="file" accept="image/*" className="mb-3 text-sm text-gray-700"
-                      onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; await uploadImage(file, "roof"); }}
-                    />
-                  )}
+                  {isAdmin && <input type="file" accept="image/*" className="mb-3 text-sm text-gray-700" onChange={async (e) => { const file = e.target.files?.[0]; if (file) await uploadImage(file, "roof"); }} />}
                   <div className="grid grid-cols-3 gap-2">
                     {form.roof_images.map((img, i) => (
-                      <img key={img} src={img} alt="" onClick={() => { setLightboxImages(form.roof_images || []); setActiveIndex(i); setLightboxCanDelete(isAdmin); setLightboxCategoryId(null); setOpenLightbox(true); }} className="rounded border h-28 w-full object-cover cursor-pointer" />
+                      <img key={img} src={img} alt="" onClick={() => { setLightboxImages(form.roof_images); setActiveIndex(i); setLightboxCanDelete(isAdmin); setLightboxCategoryId(null); setOpenLightbox(true); }} className="rounded border h-28 w-full object-cover cursor-pointer" />
                     ))}
                   </div>
                 </div>
@@ -685,14 +593,10 @@ export default function ProjectsPage() {
               </button>
               {showSimulation && (
                 <div className="p-2 mt-1">
-                  {isAdmin && (
-                    <input type="file" accept="image/*" className="mb-3 text-sm text-gray-700"
-                      onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; await uploadImage(file, "simulation"); }}
-                    />
-                  )}
+                  {isAdmin && <input type="file" accept="image/*" className="mb-3 text-sm text-gray-700" onChange={async (e) => { const file = e.target.files?.[0]; if (file) await uploadImage(file, "simulation"); }} />}
                   <div className="grid grid-cols-3 gap-2">
                     {form.simulation_images.map((img, i) => (
-                      <img key={img} src={img} alt="" onClick={() => { setLightboxImages(form.simulation_images || []); setActiveIndex(i); setLightboxCanDelete(isAdmin); setLightboxCategoryId(null); setOpenLightbox(true); }} className="rounded border h-28 w-full object-cover cursor-pointer" />
+                      <img key={img} src={img} alt="" onClick={() => { setLightboxImages(form.simulation_images); setActiveIndex(i); setLightboxCanDelete(isAdmin); setLightboxCategoryId(null); setOpenLightbox(true); }} className="rounded border h-28 w-full object-cover cursor-pointer" />
                     ))}
                   </div>
                 </div>
@@ -701,10 +605,7 @@ export default function ProjectsPage() {
               {/* ── POZE MONTAJ ── */}
               {selectedProject && (
                 <>
-                  <button
-                    className="w-full text-left font-bold text-gray-900 bg-gray-100 p-3 rounded mt-3 text-base"
-                    onClick={() => setShowMontaj(!showMontaj)}
-                  >
+                  <button className="w-full text-left font-bold text-gray-900 bg-gray-100 p-3 rounded mt-3 text-base" onClick={() => setShowMontaj(!showMontaj)}>
                     📸 Poze Montaj {showMontaj ? "▲" : "▼"}
                   </button>
 
@@ -721,13 +622,14 @@ export default function ProjectsPage() {
                             onChange={(e) => setNewCategoryName(e.target.value)}
                             onKeyDown={(e) => { if (e.key === "Enter") handleAddCategory(); }}
                           />
-                          <button
-                            className="bg-green-600 text-white px-3 py-2 rounded text-sm font-semibold hover:bg-green-700 transition whitespace-nowrap"
-                            onClick={handleAddCategory}
-                          >
+                          <button className="bg-green-600 text-white px-3 py-2 rounded text-sm font-semibold hover:bg-green-700 transition whitespace-nowrap" onClick={handleAddCategory}>
                             + Categorie
                           </button>
                         </div>
+                      )}
+
+                      {isAdmin && montajCategories.length > 1 && (
+                        <p className="text-xs text-gray-400 italic mb-2">💡 Trage categoriile pentru a le reordona, sau folosește săgețile ↑↓</p>
                       )}
 
                       {montajCategories.length === 0 ? (
@@ -736,51 +638,92 @@ export default function ProjectsPage() {
                         </p>
                       ) : (
                         <div className="space-y-3">
-                          {montajCategories.map((cat) => {
+                          {montajCategories.map((cat, catIndex) => {
                             const catImages = montajImages.filter((img) => img.category_id === cat.id);
                             const isCollapsed = collapsedCategories[cat.id] ?? false;
+                            const isEditingThis = editingCategoryId === cat.id;
 
                             return (
-                              <div key={cat.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                              <div
+                                key={cat.id}
+                                className="border border-gray-200 rounded-lg overflow-hidden transition-all"
+                                draggable={isAdmin}
+                                onDragStart={() => handleDragStart(cat.id)}
+                                onDragOver={(e) => { handleDragOver(e, cat.id); (e.currentTarget as HTMLElement).classList.add("drag-over"); }}
+                                onDragLeave={(e) => (e.currentTarget as HTMLElement).classList.remove("drag-over")}
+                                onDrop={(e) => { (e.currentTarget as HTMLElement).classList.remove("drag-over"); handleDrop(); }}
+                              >
                                 {/* Header categorie */}
-                                <div className="flex items-center justify-between bg-gray-50 px-3 py-2">
-                                  <button
-                                    className="flex items-center gap-2 flex-1 text-left"
-                                    onClick={() => setCollapsedCategories((prev) => ({ ...prev, [cat.id]: !prev[cat.id] }))}
-                                  >
-                                    <span className="font-semibold text-sm text-gray-800">{cat.name}</span>
-                                    <span className="text-xs text-gray-400">({catImages.length} poze)</span>
-                                    <span className="text-gray-400 text-xs ml-auto">{isCollapsed ? "▼" : "▲"}</span>
-                                  </button>
+                                <div className="flex items-center bg-gray-50 px-3 py-2 gap-2">
+
+                                  {/* Drag handle (admin) */}
                                   {isAdmin && (
+                                    <span className="text-gray-300 cursor-grab active:cursor-grabbing text-lg select-none shrink-0" title="Trage pentru a reordona">⠿</span>
+                                  )}
+
+                                  {/* Nume — mod editare sau normal */}
+                                  {isAdmin && isEditingThis ? (
+                                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                                      <input
+                                        className="border border-blue-400 p-1 rounded text-sm text-gray-900 flex-1 min-w-0"
+                                        value={editingCategoryName}
+                                        onChange={(e) => setEditingCategoryName(e.target.value)}
+                                        onKeyDown={(e) => { if (e.key === "Enter") handleSaveEditCategory(cat.id); if (e.key === "Escape") setEditingCategoryId(null); }}
+                                        autoFocus
+                                      />
+                                      <button className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-semibold hover:bg-blue-700 whitespace-nowrap" onClick={() => handleSaveEditCategory(cat.id)}>✓</button>
+                                      <button className="bg-gray-300 text-gray-700 px-2 py-1 rounded text-xs font-semibold hover:bg-gray-400" onClick={() => setEditingCategoryId(null)}>✕</button>
+                                    </div>
+                                  ) : (
                                     <button
-                                      className="text-red-400 hover:text-red-600 text-sm font-bold ml-3 shrink-0"
-                                      onClick={() => handleDeleteCategory(cat.id)}
-                                      title="Șterge categoria"
+                                      className="flex items-center gap-2 flex-1 text-left min-w-0"
+                                      onClick={() => setCollapsedCategories((prev) => ({ ...prev, [cat.id]: !prev[cat.id] }))}
                                     >
-                                      ✕
+                                      <span className="font-semibold text-sm text-gray-800 truncate">{cat.name}</span>
+                                      <span className="text-xs text-gray-400 shrink-0">({catImages.length} poze)</span>
+                                      <span className="text-gray-400 text-xs ml-auto shrink-0">{isCollapsed ? "▼" : "▲"}</span>
                                     </button>
+                                  )}
+
+                                  {/* Butoane admin: ↑ ↓ ✏️ ✕ */}
+                                  {isAdmin && !isEditingThis && (
+                                    <div className="flex items-center gap-1 shrink-0 ml-1">
+                                      <button
+                                        className="text-gray-400 hover:text-gray-700 font-bold px-1 disabled:opacity-20"
+                                        onClick={() => moveCategoryUp(catIndex)}
+                                        disabled={catIndex === 0}
+                                        title="Mută sus"
+                                      >↑</button>
+                                      <button
+                                        className="text-gray-400 hover:text-gray-700 font-bold px-1 disabled:opacity-20"
+                                        onClick={() => moveCategoryDown(catIndex)}
+                                        disabled={catIndex === montajCategories.length - 1}
+                                        title="Mută jos"
+                                      >↓</button>
+                                      <button
+                                        className="text-blue-400 hover:text-blue-600 text-sm font-bold px-1"
+                                        onClick={() => { setEditingCategoryId(cat.id); setEditingCategoryName(cat.name); }}
+                                        title="Editează numele"
+                                      >✏️</button>
+                                      <button
+                                        className="text-red-400 hover:text-red-600 text-sm font-bold px-1"
+                                        onClick={() => handleDeleteCategory(cat.id)}
+                                        title="Șterge categoria"
+                                      >✕</button>
+                                    </div>
                                   )}
                                 </div>
 
                                 {/* Continut categorie */}
                                 {!isCollapsed && (
                                   <div className="p-3">
-                                    {/* Upload buton — disponibil tuturor dacă nu e salvat */}
                                     {!montajSaved && (
                                       <label className="inline-flex items-center gap-2 cursor-pointer bg-blue-50 border border-blue-200 text-blue-700 px-3 py-2 rounded text-sm font-medium hover:bg-blue-100 transition mb-3">
                                         {uploadingCategory === cat.id ? "⏳ Se încarcă..." : "📷 Adaugă poze"}
-                                        <input
-                                          type="file"
-                                          accept="image/*"
-                                          multiple
-                                          className="hidden"
-                                          disabled={uploadingCategory !== null}
+                                        <input type="file" accept="image/*" multiple className="hidden" disabled={uploadingCategory !== null}
                                           onChange={async (e) => {
                                             const files = Array.from(e.target.files || []);
-                                            for (const file of files) {
-                                              await uploadMontajImage(file, cat.id);
-                                            }
+                                            for (const file of files) await uploadMontajImage(file, cat.id);
                                             e.target.value = "";
                                           }}
                                         />
@@ -794,27 +737,21 @@ export default function ProjectsPage() {
                                         {catImages.map((img, i) => (
                                           <div key={img.id} className="relative group">
                                             <img
-                                              src={img.url}
-                                              alt=""
+                                              src={img.url} alt=""
                                               className="rounded border h-28 w-full object-cover cursor-pointer"
                                               onClick={() => {
-                                                const urls = catImages.map((ci) => ci.url);
-                                                setLightboxImages(urls);
+                                                setLightboxImages(catImages.map((ci) => ci.url));
                                                 setActiveIndex(i);
                                                 setLightboxCanDelete(!montajSaved);
                                                 setLightboxCategoryId(cat.id);
                                                 setOpenLightbox(true);
                                               }}
                                             />
-                                            {/* Buton ștergere rapidă pe thumbnail (doar dacă nu e salvat) */}
                                             {!montajSaved && (
                                               <button
                                                 className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-6 h-6 text-xs font-bold opacity-0 group-hover:opacity-100 transition flex items-center justify-center"
                                                 onClick={(e) => { e.stopPropagation(); deleteMontajImage(img.id); }}
-                                                title="Șterge poza"
-                                              >
-                                                ✕
-                                              </button>
+                                              >✕</button>
                                             )}
                                           </div>
                                         ))}
@@ -831,23 +768,13 @@ export default function ProjectsPage() {
                       {/* Butoane Salvează / Deblochează */}
                       <div className="mt-4 flex flex-wrap gap-2 items-center">
                         {!montajSaved && (
-                          <button
-                            className="bg-blue-600 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-blue-700 transition"
-                            onClick={handleSaveMontaj}
-                          >
+                          <button className="bg-blue-600 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-blue-700 transition" onClick={handleSaveMontaj}>
                             💾 Salvează poze montaj
                           </button>
                         )}
-                        {montajSaved && (
-                          <span className="text-sm text-green-700 font-semibold flex items-center gap-1">
-                            ✅ Poze montaj salvate
-                          </span>
-                        )}
+                        {montajSaved && <span className="text-sm text-green-700 font-semibold">✅ Poze montaj salvate</span>}
                         {montajSaved && isAdmin && (
-                          <button
-                            className="bg-orange-500 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-orange-600 transition"
-                            onClick={handleUnlockMontaj}
-                          >
+                          <button className="bg-orange-500 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-orange-600 transition" onClick={handleUnlockMontaj}>
                             🔓 Deblochează pentru modificare
                           </button>
                         )}
@@ -861,10 +788,7 @@ export default function ProjectsPage() {
               {/* ── MATERIALE FOLOSITE ── */}
               {selectedProject && (
                 <>
-                  <button
-                    className="w-full text-left font-bold text-gray-900 bg-gray-100 p-3 rounded mt-3 text-base"
-                    onClick={() => setShowMaterials(!showMaterials)}
-                  >
+                  <button className="w-full text-left font-bold text-gray-900 bg-gray-100 p-3 rounded mt-3 text-base" onClick={() => setShowMaterials(!showMaterials)}>
                     🔧 Materiale folosite {showMaterials ? "▲" : "▼"}
                   </button>
 
@@ -872,31 +796,14 @@ export default function ProjectsPage() {
                     <div className="p-2 mt-1">
                       {isAdmin && (
                         <div className="flex flex-wrap gap-2 mb-4">
-                          <input
-                            className="border border-gray-300 p-2 rounded text-sm text-gray-900 placeholder-gray-500 flex-1 min-w-[150px]"
-                            placeholder="Nume material (ex: Clemă capăt)"
-                            value={newMaterialName}
-                            onChange={(e) => setNewMaterialName(e.target.value)}
-                          />
-                          <input
-                            className="border border-gray-300 p-2 rounded text-sm text-gray-900 w-24"
-                            placeholder="U.M. (buc)"
-                            value={newMaterialUnit}
-                            onChange={(e) => setNewMaterialUnit(e.target.value)}
-                          />
-                          <button
-                            className="bg-green-600 text-white px-3 py-2 rounded text-sm font-semibold hover:bg-green-700 transition"
-                            onClick={handleAddMaterial}
-                          >
-                            + Adaugă
-                          </button>
+                          <input className="border border-gray-300 p-2 rounded text-sm text-gray-900 placeholder-gray-500 flex-1 min-w-[150px]" placeholder="Nume material (ex: Clemă capăt)" value={newMaterialName} onChange={(e) => setNewMaterialName(e.target.value)} />
+                          <input className="border border-gray-300 p-2 rounded text-sm text-gray-900 w-24" placeholder="U.M. (buc)" value={newMaterialUnit} onChange={(e) => setNewMaterialUnit(e.target.value)} />
+                          <button className="bg-green-600 text-white px-3 py-2 rounded text-sm font-semibold hover:bg-green-700 transition" onClick={handleAddMaterial}>+ Adaugă</button>
                         </div>
                       )}
 
                       {materials.length === 0 ? (
-                        <p className="text-sm text-gray-500 italic">
-                          {isAdmin ? "Nu există materiale definite. Adaugă primul material mai sus." : "Nu există materiale definite de admin."}
-                        </p>
+                        <p className="text-sm text-gray-500 italic">{isAdmin ? "Nu există materiale definite. Adaugă primul material mai sus." : "Nu există materiale definite de admin."}</p>
                       ) : (
                         <div className="space-y-2">
                           {materials.map((mat) => (
@@ -905,34 +812,29 @@ export default function ProjectsPage() {
                                 <>
                                   <input className="border border-blue-400 p-1 rounded text-sm text-gray-900 flex-1 min-w-0" value={editingMaterialName} onChange={(e) => setEditingMaterialName(e.target.value)} autoFocus />
                                   <input className="border border-blue-400 p-1 rounded text-sm text-gray-900 w-16" value={editingMaterialUnit} onChange={(e) => setEditingMaterialUnit(e.target.value)} />
-                                  <button className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-semibold hover:bg-blue-700 transition whitespace-nowrap" onClick={() => handleSaveEditMaterial(mat.id)}>✓ Salvează</button>
-                                  <button className="bg-gray-300 text-gray-700 px-2 py-1 rounded text-xs font-semibold hover:bg-gray-400 transition" onClick={handleCancelEditMaterial}>✕</button>
+                                  <button className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-semibold hover:bg-blue-700 whitespace-nowrap" onClick={() => handleSaveEditMaterial(mat.id)}>✓ Salvează</button>
+                                  <button className="bg-gray-300 text-gray-700 px-2 py-1 rounded text-xs font-semibold hover:bg-gray-400" onClick={() => setEditingMaterialId(null)}>✕</button>
                                 </>
                               ) : (
                                 <>
-                                  <span className="flex-1 text-sm font-medium text-gray-800 min-w-0">
-                                    {mat.name}
-                                    <span className="text-gray-400 ml-1 text-xs">({mat.unit})</span>
-                                  </span>
+                                  <span className="flex-1 text-sm font-medium text-gray-800 min-w-0">{mat.name}<span className="text-gray-400 ml-1 text-xs">({mat.unit})</span></span>
                                   <input
-                                    type="number"
-                                    min="0"
+                                    type="number" min="0"
                                     className={`border border-gray-300 p-2 rounded text-sm text-gray-900 w-24 text-center shrink-0 ${materialsSaved && !isAdmin ? "bg-gray-100 text-gray-500 cursor-not-allowed" : "bg-white"}`}
-                                    placeholder="0"
-                                    value={quantities[mat.id] || ""}
+                                    placeholder="0" value={quantities[mat.id] || ""}
                                     disabled={materialsSaved && !isAdmin}
                                     onChange={(e) => {
                                       const val = e.target.value;
                                       setQuantities((prev) => ({ ...prev, [mat.id]: val }));
                                       if (debounceRef.current) clearTimeout(debounceRef.current);
-                                      debounceRef.current = setTimeout(() => { autoSaveQuantity(mat.id, val, projectMaterials); }, 1000);
+                                      debounceRef.current = setTimeout(() => autoSaveQuantity(mat.id, val, projectMaterials), 1000);
                                     }}
                                   />
                                   <span className="text-xs text-gray-400 w-8 shrink-0">{mat.unit}</span>
                                   {isAdmin && (
                                     <>
-                                      <button className="text-blue-500 hover:text-blue-700 text-sm font-bold px-1 shrink-0" onClick={() => handleStartEditMaterial(mat)} title="Editează material">✏️</button>
-                                      <button className="text-red-500 hover:text-red-700 text-sm font-bold px-1 shrink-0" onClick={() => handleDeleteMaterial(mat.id)} title="Șterge material">✕</button>
+                                      <button className="text-blue-500 hover:text-blue-700 text-sm font-bold px-1 shrink-0" onClick={() => { setEditingMaterialId(mat.id); setEditingMaterialName(mat.name); setEditingMaterialUnit(mat.unit); }}>✏️</button>
+                                      <button className="text-red-500 hover:text-red-700 text-sm font-bold px-1 shrink-0" onClick={() => handleDeleteMaterial(mat.id)}>✕</button>
                                     </>
                                   )}
                                 </>
@@ -946,19 +848,9 @@ export default function ProjectsPage() {
 
                       {materials.length > 0 && (
                         <div className="mt-4 flex flex-wrap gap-2 items-center">
-                          {!materialsSaved && (
-                            <button className="bg-blue-600 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-blue-700 transition" onClick={handleSaveMaterials}>
-                              💾 Salvează materiale
-                            </button>
-                          )}
-                          {materialsSaved && (
-                            <span className="text-sm text-green-700 font-semibold flex items-center gap-1">✅ Materiale salvate</span>
-                          )}
-                          {materialsSaved && isAdmin && (
-                            <button className="bg-orange-500 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-orange-600 transition" onClick={handleUnlockMaterials}>
-                              🔓 Deblochează pentru modificare
-                            </button>
-                          )}
+                          {!materialsSaved && <button className="bg-blue-600 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-blue-700 transition" onClick={handleSaveMaterials}>💾 Salvează materiale</button>}
+                          {materialsSaved && <span className="text-sm text-green-700 font-semibold">✅ Materiale salvate</span>}
+                          {materialsSaved && isAdmin && <button className="bg-orange-500 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-orange-600 transition" onClick={handleUnlockMaterials}>🔓 Deblochează pentru modificare</button>}
                         </div>
                       )}
                     </div>
@@ -968,14 +860,8 @@ export default function ProjectsPage() {
 
               {/* Butoane jos */}
               <div className="flex flex-wrap gap-2 mt-6">
-                <button className="bg-gray-300 text-gray-800 font-semibold px-4 py-3 rounded text-base" onClick={resetForm}>
-                  Închide
-                </button>
-                {isAdmin && !selectedProject && (
-                  <button className="bg-blue-600 text-white font-semibold px-4 py-3 rounded text-base" onClick={handleSave}>
-                    Salvează
-                  </button>
-                )}
+                <button className="bg-gray-300 text-gray-800 font-semibold px-4 py-3 rounded text-base" onClick={resetForm}>Închide</button>
+                {isAdmin && !selectedProject && <button className="bg-blue-600 text-white font-semibold px-4 py-3 rounded text-base" onClick={handleSave}>Salvează</button>}
                 {isAdmin && selectedProject && (
                   <>
                     <button className="bg-blue-600 text-white font-semibold px-4 py-3 rounded text-base" onClick={handleUpdate}>Actualizează</button>
@@ -997,7 +883,6 @@ export default function ProjectsPage() {
               lightboxCanDelete
                 ? (img) => {
                     if (lightboxCategoryId) {
-                      // Poze montaj — stergere din DB
                       const found = montajImages.find((mi) => mi.url === img);
                       if (found) deleteMontajImage(found.id);
                       setLightboxImages((prev) => {
@@ -1006,7 +891,6 @@ export default function ProjectsPage() {
                         return filtered;
                       });
                     } else {
-                      // Poze acoperis / simulare
                       deleteImage(img, form.roof_images.includes(img) ? "roof" : "simulation");
                     }
                   }
