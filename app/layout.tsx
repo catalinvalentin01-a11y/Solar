@@ -57,15 +57,20 @@ export default function RootLayout({
 
         {/* SIDEBAR */}
         <aside className="w-full md:w-64 bg-gray-900 text-white p-4 flex flex-col gap-3">
-          <h1 className="text-xl font-bold mb-2">☀️ Solar CRM</h1>
+          <h1 className="text-xl font-bold mb-2">☀️ Solar </h1>
 
           <nav className="space-y-2 flex-1">
             <Link href="/" className="block hover:text-gray-300">
               Dashboard
             </Link>
-            <Link href="/clients" className="block hover:text-gray-300">
-              Clienți
-            </Link>
+
+            {/* Clienți — vizibil doar pentru admini */}
+            {isAdmin && (
+              <Link href="/clients" className="block hover:text-gray-300">
+                Clienți
+              </Link>
+            )}
+
             <Link href="/projects" className="block hover:text-gray-300">
               Proiecte
             </Link>
