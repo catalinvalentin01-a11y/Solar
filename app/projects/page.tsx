@@ -622,7 +622,11 @@ export default function ProjectsPage() {
               if (!isAdmin) return;
               setSelectedProject(null); setSelectedDate(info.dateStr);
               setProjectMaterials([]); setQuantities({}); setMaterialsSaved(false);
-              setMontajImages([]); setMontajSaved(false); setOpen(true);
+              setMontajImages([]); setMontajSaved(false);
+              // Proiect nou → toate secțiunile deschise
+              setShowClient(true); setShowTechnical(true); setShowRoof(true);
+              setShowSimulation(true); setShowMaterials(true); setShowMontaj(true);
+              setOpen(true);
             }}
             eventClick={(info) => {
               const p = info.event.extendedProps as Project;
@@ -635,6 +639,9 @@ export default function ProjectsPage() {
                 notes: p.notes || "", status: p.status || "Programat",
                 roof_images: p.roof_images || [], simulation_images: p.simulation_images || [],
               });
+              // Proiect existent → toate secțiunile închise
+              setShowClient(false); setShowTechnical(false); setShowRoof(false);
+              setShowSimulation(false); setShowMaterials(false); setShowMontaj(false);
               loadProjectMaterials(info.event.id);
               loadMontajImages(info.event.id);
               setOpen(true);
