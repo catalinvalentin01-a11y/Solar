@@ -5,6 +5,9 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import NotificationBell from "@/components/NotificationBell";
+
+const SUPER_ADMIN = "catalinvalentin01@gmail.com";
 
 export default function RootLayout({
   children,
@@ -16,6 +19,7 @@ export default function RootLayout({
   const router = useRouter();
 
   const checkAdmin = async (userEmail: string) => {
+    if (userEmail === SUPER_ADMIN) { setIsAdmin(true); return; }
     const { data } = await supabase
       .from("user_access")
       .select("is_admin")
@@ -57,14 +61,17 @@ export default function RootLayout({
 
         {/* SIDEBAR */}
         <aside className="w-full md:w-64 bg-gray-900 text-white p-4 flex flex-col gap-3">
-          <h1 className="text-xl font-bold mb-2">☀️ Solar </h1>
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-xl font-bold">☀️ Solar</h1>
+            {/* Clopoțel — vizibil doar pentru admini */}
+            {isAdmin && <NotificationBell />}
+          </div>
 
           <nav className="space-y-2 flex-1">
             <Link href="/" className="block hover:text-gray-300">
               Dashboard
             </Link>
 
-            {/* Clienți — vizibil doar pentru admini */}
             {isAdmin && (
               <Link href="/clients" className="block hover:text-gray-300">
                 Clienți
@@ -75,7 +82,10 @@ export default function RootLayout({
               Proiecte
             </Link>
 
-            {/* Buton Admin — vizibil doar pentru admini */}
+            <Link href="/today" className="block hover:text-gray-300">
+              Montaje Azi
+            </Link>
+
             {isAdmin && (
               <Link
                 href="/admin"
@@ -86,7 +96,6 @@ export default function RootLayout({
             )}
           </nav>
 
-          {/* USER INFO / LOGIN */}
           <div className="border-t border-gray-700 pt-3 mt-2">
             {email ? (
               <div className="flex flex-col gap-2">

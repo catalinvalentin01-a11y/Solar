@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, Suspense } from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
@@ -8,6 +8,7 @@ import roLocale from "@fullcalendar/core/locales/ro";
 import AuthGuard from "@/components/AuthGuard";
 import { supabase } from "@/lib/supabase";
 import ImageLightbox from "@/components/ImageLightbox";
+import { useSearchParams } from "next/navigation";
 
 const SUPER_ADMIN = "catalinvalentin01@gmail.com";
 
@@ -58,9 +59,20 @@ type MontajImage = {
 };
 
 export default function ProjectsPage() {
+  return (
+    <Suspense fallback={null}>
+      <ProjectsPageInner />
+    </Suspense>
+  );
+}
+
+function ProjectsPageInner() {
   const [events, setEvents] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false); // super admin SAU admin
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [projectFinalized, setProjectFinalized] = useState(false);
+  const searchParams = useSearchParams();
 
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -78,7 +90,6 @@ export default function ProjectsPage() {
   const [showMaterials, setShowMaterials] = useState(true);
   const [showMontaj, setShowMontaj] = useState(true);
 
-  // Materiale
   const [materials, setMaterials] = useState<Material[]>([]);
   const [projectMaterials, setProjectMaterials] = useState<ProjectMaterial[]>([]);
   const [quantities, setQuantities] = useState<Record<string, string>>({});
@@ -92,7 +103,6 @@ export default function ProjectsPage() {
   const [editingMaterialName, setEditingMaterialName] = useState("");
   const [editingMaterialUnit, setEditingMaterialUnit] = useState("");
 
-  // Poze Montaj
   const [montajCategories, setMontajCategories] = useState<MontajCategory[]>([]);
   const [montajImages, setMontajImages] = useState<MontajImage[]>([]);
   const [montajSaved, setMontajSaved] = useState(false);
@@ -100,11 +110,9 @@ export default function ProjectsPage() {
   const [uploadingCategory, setUploadingCategory] = useState<string | null>(null);
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
 
-  // Editare categorie
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState("");
 
-  // Drag & drop
   const dragCatRef = useRef<string | null>(null);
   const dragOverCatRef = useRef<string | null>(null);
 
@@ -114,25 +122,20 @@ export default function ProjectsPage() {
     status: "Programat", roof_images: [], simulation_images: [],
   });
 
-  // ── AUTH: verifică dacă userul e super admin sau admin ──────
   useEffect(() => {
     const check = async () => {
       const { data } = await supabase.auth.getUser();
       if (!data.user) return;
-
-      // Super adminul e mereu admin
       if (data.user.email === SUPER_ADMIN) {
         setIsAdmin(true);
+        setIsSuperAdmin(true);
         return;
       }
-
-      // Verifică is_admin în user_access
       const { data: access } = await supabase
         .from("user_access")
         .select("is_admin")
         .eq("email", data.user.email)
         .single();
-
       setIsAdmin(access?.is_admin === true);
     };
     check();
@@ -187,6 +190,32 @@ export default function ProjectsPage() {
     loadMontajCategories();
   }, []);
 
+  // Auto-deschide proiectul dacă vine din Today (?open=ID)
+  useEffect(() => {
+    const openId = searchParams.get("open");
+    if (!openId) return;
+    const tryOpen = async () => {
+      const { data: p, error } = await supabase.from("projects").select("*").eq("id", openId).single();
+      if (error || !p) return;
+      setSelectedProject({ ...p, id: p.id });
+      setSelectedDate(p.date || null);
+      setForm({
+        client: p.client || "", phone: p.phone || "", email: p.email || "",
+        title: p.title || "", location: p.location || "", kw: p.kw || "",
+        battery: p.battery || "", panels: p.panels || "", inverter: p.inverter || "",
+        notes: p.notes || "", status: p.status || "Programat",
+        roof_images: p.roof_images || [], simulation_images: p.simulation_images || [],
+      });
+      setProjectFinalized(p.status === "Finalizat");
+      setShowClient(false); setShowTechnical(false); setShowRoof(false);
+      setShowSimulation(false); setShowMaterials(false); setShowMontaj(false);
+      loadProjectMaterials(p.id);
+      loadMontajImages(p.id);
+      setOpen(true);
+    };
+    tryOpen();
+  }, [searchParams]);
+
   const resetForm = () => {
     setForm({ client: "", phone: "", email: "", title: "", location: "", kw: "", battery: "", panels: "", inverter: "", notes: "", status: "Programat", roof_images: [], simulation_images: [] });
     setSelectedProject(null);
@@ -196,6 +225,7 @@ export default function ProjectsPage() {
     setMaterialsSaved(false);
     setMontajImages([]);
     setMontajSaved(false);
+    setProjectFinalized(false);
     setOpen(false);
     setEditingMaterialId(null);
     setEditingCategoryId(null);
@@ -229,6 +259,34 @@ export default function ProjectsPage() {
     if (error) { console.error(error); return; }
     await loadProjects();
     resetForm();
+  };
+
+  const handleFinalizeProject = async () => {
+    if (!selectedProject?.id) return;
+    const confirmed = confirm(
+      `Ești sigur că vrei să finalizezi proiectul "${form.client} - ${form.title}"?\n\nDupă finalizare, toate modificările vor fi blocate.`
+    );
+    if (!confirmed) return;
+    const { error } = await supabase.from("projects").update({ status: "Finalizat" }).eq("id", selectedProject.id);
+    if (error) { alert("Eroare: " + error.message); return; }
+    await supabase.from("notifications").insert({
+      title: "✅ Proiect finalizat",
+      message: `Proiectul "${form.client} - ${form.title}" (${selectedDate || "fără dată"}) a fost marcat ca finalizat.`,
+      project_id: selectedProject.id,
+    });
+    setProjectFinalized(true);
+    setForm((prev) => ({ ...prev, status: "Finalizat" }));
+    await loadProjects();
+  };
+
+  const handleUnlockProject = async () => {
+    if (!selectedProject?.id) return;
+    if (!confirm("Deblochezi proiectul pentru modificare?")) return;
+    const { error } = await supabase.from("projects").update({ status: "În lucru" }).eq("id", selectedProject.id);
+    if (error) { alert("Eroare: " + error.message); return; }
+    setProjectFinalized(false);
+    setForm((prev) => ({ ...prev, status: "În lucru" }));
+    await loadProjects();
   };
 
   // ── MATERIALE ──────────────────────────────────────────────
@@ -297,51 +355,23 @@ export default function ProjectsPage() {
 
   const handlePrintMaterials = () => {
     const printContent = `
-      <html>
-      <head>
-        <title>Materiale — ${form.client} / ${form.title}</title>
-        <style>
-          body { font-family: Arial, sans-serif; padding: 32px; color: #111; }
-          h1 { font-size: 20px; margin-bottom: 4px; }
-          p { font-size: 13px; color: #555; margin-bottom: 24px; }
-          table { width: 100%; border-collapse: collapse; }
-          th { background: #f3f4f6; text-align: left; padding: 10px 12px; font-size: 13px; border: 1px solid #e5e7eb; }
-          td { padding: 10px 12px; font-size: 13px; border: 1px solid #e5e7eb; }
-          tr:nth-child(even) td { background: #f9fafb; }
-          .qty { font-weight: bold; text-align: center; }
-          .empty { color: #aaa; text-align: center; }
-          @media print { body { padding: 16px; } }
-        </style>
-      </head>
-      <body>
+      <html><head><title>Materiale — ${form.client} / ${form.title}</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 32px; color: #111; }
+        h1 { font-size: 20px; margin-bottom: 4px; }
+        p { font-size: 13px; color: #555; margin-bottom: 24px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f3f4f6; text-align: left; padding: 10px 12px; font-size: 13px; border: 1px solid #e5e7eb; }
+        td { padding: 10px 12px; font-size: 13px; border: 1px solid #e5e7eb; }
+        tr:nth-child(even) td { background: #f9fafb; }
+        .qty { font-weight: bold; text-align: center; }
+        .empty { color: #aaa; text-align: center; }
+      </style></head><body>
         <h1>Lista materiale — ${form.client || "—"}</h1>
-        <p>
-          Proiect: ${form.title || "—"} &nbsp;|&nbsp;
-          Locație: ${form.location || "—"} &nbsp;|&nbsp;
-          Data: ${selectedDate || "—"}
-        </p>
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Material</th>
-              <th>U.M.</th>
-              <th>Cantitate</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${materials.map((mat, i) => `
-              <tr>
-                <td>${i + 1}</td>
-                <td>${mat.name}</td>
-                <td>${mat.unit}</td>
-                <td class="${quantities[mat.id] ? "qty" : "empty"}">${quantities[mat.id] || "—"}</td>
-              </tr>`).join("")}
-          </tbody>
-        </table>
-      </body>
-      </html>
-    `;
+        <p>Proiect: ${form.title || "—"} &nbsp;|&nbsp; Locație: ${form.location || "—"} &nbsp;|&nbsp; Data: ${selectedDate || "—"}</p>
+        <table><thead><tr><th>#</th><th>Material</th><th>U.M.</th><th>Cantitate</th></tr></thead>
+        <tbody>${materials.map((mat, i) => `<tr><td>${i + 1}</td><td>${mat.name}</td><td>${mat.unit}</td><td class="${quantities[mat.id] ? "qty" : "empty"}">${quantities[mat.id] || "—"}</td></tr>`).join("")}</tbody>
+        </table></body></html>`;
     const win = window.open("", "_blank");
     if (!win) return;
     win.document.write(printContent);
@@ -351,87 +381,47 @@ export default function ProjectsPage() {
   };
 
   const handleDownloadPDF = () => {
-    // Folosim jsPDF
     import("jspdf").then(({ jsPDF }) => {
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-
       const margin = 15;
       const pageWidth = doc.internal.pageSize.getWidth();
-      const colWidths = [10, 100, 25, 35]; // #, Material, U.M., Cantitate
+      const colWidths = [10, 100, 25, 35];
       const tableWidth = colWidths.reduce((a, b) => a + b, 0);
       const startX = (pageWidth - tableWidth) / 2;
-
-      // Titlu
       doc.setFont("helvetica", "bold");
       doc.setFontSize(16);
       doc.text(`Lista materiale — ${form.client || "—"}`, margin, 20);
-
-      // Subtitlu
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
       doc.setTextColor(100);
-      doc.text(
-        `Proiect: ${form.title || "—"}   |   Locație: ${form.location || "—"}   |   Data: ${selectedDate || "—"}`,
-        margin, 28
-      );
+      doc.text(`Proiect: ${form.title || "—"}   |   Locație: ${form.location || "—"}   |   Data: ${selectedDate || "—"}`, margin, 28);
       doc.setTextColor(0);
-
-      // Header tabel
       let y = 38;
       const rowH = 9;
-      const headers = ["#", "Material", "U.M.", "Cantitate"];
-
       doc.setFillColor(243, 244, 246);
       doc.rect(startX, y, tableWidth, rowH, "F");
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10);
       let x = startX;
-      headers.forEach((h, i) => {
-        doc.text(h, x + 2, y + 6);
-        x += colWidths[i];
-      });
-
-      // Linii tabel
+      ["#", "Material", "U.M.", "Cantitate"].forEach((h, i) => { doc.text(h, x + 2, y + 6); x += colWidths[i]; });
       doc.setFont("helvetica", "normal");
       materials.forEach((mat, idx) => {
         y += rowH;
-
-        // Fundal alternativ
-        if (idx % 2 === 1) {
-          doc.setFillColor(249, 250, 251);
-          doc.rect(startX, y, tableWidth, rowH, "F");
-        }
-
+        if (idx % 2 === 1) { doc.setFillColor(249, 250, 251); doc.rect(startX, y, tableWidth, rowH, "F"); }
         const qty = quantities[mat.id] || "—";
-        const row = [`${idx + 1}`, mat.name, mat.unit, qty];
         x = startX;
-        doc.setFontSize(10);
-        row.forEach((cell, i) => {
-          // Cantitate bold dacă există
-          if (i === 3 && quantities[mat.id]) {
-            doc.setFont("helvetica", "bold");
-          } else {
-            doc.setFont("helvetica", "normal");
-          }
-          // Trunchiază textul lung
+        [`${idx + 1}`, mat.name, mat.unit, qty].forEach((cell, i) => {
+          if (i === 3 && quantities[mat.id]) doc.setFont("helvetica", "bold"); else doc.setFont("helvetica", "normal");
           const maxW = colWidths[i] - 4;
-          const truncated = doc.getTextWidth(cell) > maxW
-            ? cell.substring(0, Math.floor(cell.length * maxW / doc.getTextWidth(cell)) - 2) + "…"
-            : cell;
+          const truncated = doc.getTextWidth(cell) > maxW ? cell.substring(0, Math.floor(cell.length * maxW / doc.getTextWidth(cell)) - 2) + "…" : cell;
           doc.text(truncated, x + 2, y + 6);
           x += colWidths[i];
         });
-
-        // Borduri rând
         doc.setDrawColor(229, 231, 235);
         doc.rect(startX, y, tableWidth, rowH);
       });
-
-      // Bordură header
       doc.setDrawColor(209, 213, 219);
       doc.rect(startX, 38, tableWidth, rowH);
-
-      // Salvează
       const fileName = `materiale-${(form.client || "proiect").replace(/\s+/g, "-").toLowerCase()}-${selectedDate || "fara-data"}.pdf`;
       doc.save(fileName);
     });
@@ -490,12 +480,7 @@ export default function ProjectsPage() {
   };
 
   const handleDragStart = (categoryId: string) => { dragCatRef.current = categoryId; };
-
-  const handleDragOver = (e: React.DragEvent, categoryId: string) => {
-    e.preventDefault();
-    dragOverCatRef.current = categoryId;
-  };
-
+  const handleDragOver = (e: React.DragEvent, categoryId: string) => { e.preventDefault(); dragOverCatRef.current = categoryId; };
   const handleDrop = async () => {
     const dragId = dragCatRef.current;
     const overId = dragOverCatRef.current;
@@ -550,8 +535,6 @@ export default function ProjectsPage() {
     setMontajSaved(false);
     setMontajImages((prev) => prev.map((img) => ({ ...img, saved: false })));
   };
-
-  // ── IMAGINI ACOPERIS / SIMULARE ──────────────────────────────
 
   const deleteImage = async (imgToDelete: string, type: "roof" | "simulation") => {
     setForm((prev) => {
@@ -622,8 +605,7 @@ export default function ProjectsPage() {
               if (!isAdmin) return;
               setSelectedProject(null); setSelectedDate(info.dateStr);
               setProjectMaterials([]); setQuantities({}); setMaterialsSaved(false);
-              setMontajImages([]); setMontajSaved(false);
-              // Proiect nou → toate secțiunile deschise
+              setMontajImages([]); setMontajSaved(false); setProjectFinalized(false);
               setShowClient(true); setShowTechnical(true); setShowRoof(true);
               setShowSimulation(true); setShowMaterials(true); setShowMontaj(true);
               setOpen(true);
@@ -639,7 +621,7 @@ export default function ProjectsPage() {
                 notes: p.notes || "", status: p.status || "Programat",
                 roof_images: p.roof_images || [], simulation_images: p.simulation_images || [],
               });
-              // Proiect existent → toate secțiunile închise
+              setProjectFinalized(p.status === "Finalizat");
               setShowClient(false); setShowTechnical(false); setShowRoof(false);
               setShowSimulation(false); setShowMaterials(false); setShowMontaj(false);
               loadProjectMaterials(info.event.id);
@@ -680,7 +662,7 @@ export default function ProjectsPage() {
               </button>
               {showClient && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-2 mt-1">
-                  {isAdmin ? (
+                  {isAdmin && !projectFinalized ? (
                     <>
                       <input className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500" placeholder="Client" value={form.client} onChange={(e) => setForm({ ...form, client: e.target.value })} />
                       <input className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500" placeholder="Telefon" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
@@ -704,7 +686,7 @@ export default function ProjectsPage() {
               </button>
               {showTechnical && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-2 mt-1">
-                  {isAdmin ? (
+                  {isAdmin && !projectFinalized ? (
                     <>
                       <input className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500" placeholder="Titlu proiect" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
                       <input className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500" placeholder="kW" value={form.kw} onChange={(e) => setForm({ ...form, kw: e.target.value })} />
@@ -736,10 +718,10 @@ export default function ProjectsPage() {
               </button>
               {showRoof && (
                 <div className="p-2 mt-1">
-                  {isAdmin && <input type="file" accept="image/*" className="mb-3 text-sm text-gray-700" onChange={async (e) => { const file = e.target.files?.[0]; if (file) await uploadImage(file, "roof"); }} />}
+                  {isAdmin && !projectFinalized && <input type="file" accept="image/*" className="mb-3 text-sm text-gray-700" onChange={async (e) => { const file = e.target.files?.[0]; if (file) await uploadImage(file, "roof"); }} />}
                   <div className="grid grid-cols-3 gap-2">
                     {form.roof_images.map((img, i) => (
-                      <img key={img} src={img} alt="" onClick={() => { setLightboxImages(form.roof_images); setActiveIndex(i); setLightboxCanDelete(isAdmin); setLightboxCategoryId(null); setOpenLightbox(true); }} className="rounded border h-28 w-full object-cover cursor-pointer" />
+                      <img key={img} src={img} alt="" onClick={() => { setLightboxImages(form.roof_images); setActiveIndex(i); setLightboxCanDelete(isAdmin && !projectFinalized); setLightboxCategoryId(null); setOpenLightbox(true); }} className="rounded border h-28 w-full object-cover cursor-pointer" />
                     ))}
                   </div>
                 </div>
@@ -751,10 +733,10 @@ export default function ProjectsPage() {
               </button>
               {showSimulation && (
                 <div className="p-2 mt-1">
-                  {isAdmin && <input type="file" accept="image/*" className="mb-3 text-sm text-gray-700" onChange={async (e) => { const file = e.target.files?.[0]; if (file) await uploadImage(file, "simulation"); }} />}
+                  {isAdmin && !projectFinalized && <input type="file" accept="image/*" className="mb-3 text-sm text-gray-700" onChange={async (e) => { const file = e.target.files?.[0]; if (file) await uploadImage(file, "simulation"); }} />}
                   <div className="grid grid-cols-3 gap-2">
                     {form.simulation_images.map((img, i) => (
-                      <img key={img} src={img} alt="" onClick={() => { setLightboxImages(form.simulation_images); setActiveIndex(i); setLightboxCanDelete(isAdmin); setLightboxCategoryId(null); setOpenLightbox(true); }} className="rounded border h-28 w-full object-cover cursor-pointer" />
+                      <img key={img} src={img} alt="" onClick={() => { setLightboxImages(form.simulation_images); setActiveIndex(i); setLightboxCanDelete(isAdmin && !projectFinalized); setLightboxCategoryId(null); setOpenLightbox(true); }} className="rounded border h-28 w-full object-cover cursor-pointer" />
                     ))}
                   </div>
                 </div>
@@ -766,89 +748,60 @@ export default function ProjectsPage() {
                   <button className="w-full text-left font-bold text-gray-900 bg-gray-100 p-3 rounded mt-3 text-base" onClick={() => setShowMontaj(!showMontaj)}>
                     📸 Poze Montaj {showMontaj ? "▲" : "▼"}
                   </button>
-
                   {showMontaj && (
                     <div className="p-2 mt-1">
-
-                      {isAdmin && (
+                      {isAdmin && !projectFinalized && (
                         <div className="flex gap-2 mb-4">
-                          <input
-                            className="border border-gray-300 p-2 rounded text-sm text-gray-900 placeholder-gray-500 flex-1"
-                            placeholder="Nume categorie (ex: Poze panouri)"
-                            value={newCategoryName}
-                            onChange={(e) => setNewCategoryName(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === "Enter") handleAddCategory(); }}
-                          />
-                          <button className="bg-green-600 text-white px-3 py-2 rounded text-sm font-semibold hover:bg-green-700 transition whitespace-nowrap" onClick={handleAddCategory}>
-                            + Categorie
-                          </button>
+                          <input className="border border-gray-300 p-2 rounded text-sm text-gray-900 placeholder-gray-500 flex-1" placeholder="Nume categorie (ex: Poze panouri)" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleAddCategory(); }} />
+                          <button className="bg-green-600 text-white px-3 py-2 rounded text-sm font-semibold hover:bg-green-700 transition whitespace-nowrap" onClick={handleAddCategory}>+ Categorie</button>
                         </div>
                       )}
-
                       {isAdmin && montajCategories.length > 1 && (
                         <p className="text-xs text-gray-400 italic mb-2">💡 Trage categoriile pentru a le reordona, sau folosește săgețile ↑↓</p>
                       )}
-
                       {montajCategories.length === 0 ? (
-                        <p className="text-sm text-gray-500 italic">
-                          {isAdmin ? "Nu există categorii. Adaugă prima categorie mai sus." : "Nu există categorii de poze definite."}
-                        </p>
+                        <p className="text-sm text-gray-500 italic">{isAdmin ? "Nu există categorii. Adaugă prima categorie mai sus." : "Nu există categorii de poze definite."}</p>
                       ) : (
                         <div className="space-y-3">
                           {montajCategories.map((cat, catIndex) => {
                             const catImages = montajImages.filter((img) => img.category_id === cat.id);
                             const isCollapsed = collapsedCategories[cat.id] ?? false;
                             const isEditingThis = editingCategoryId === cat.id;
-
                             return (
-                              <div
-                                key={cat.id}
-                                className="border border-gray-200 rounded-lg overflow-hidden transition-all"
-                                draggable={isAdmin}
+                              <div key={cat.id} className="border border-gray-200 rounded-lg overflow-hidden transition-all"
+                                draggable={isAdmin && !projectFinalized}
                                 onDragStart={() => handleDragStart(cat.id)}
                                 onDragOver={(e) => { handleDragOver(e, cat.id); (e.currentTarget as HTMLElement).classList.add("drag-over"); }}
                                 onDragLeave={(e) => (e.currentTarget as HTMLElement).classList.remove("drag-over")}
                                 onDrop={(e) => { (e.currentTarget as HTMLElement).classList.remove("drag-over"); handleDrop(); }}
                               >
                                 <div className="flex items-center bg-gray-50 px-3 py-2 gap-2">
-                                  {isAdmin && (
-                                    <span className="text-gray-300 cursor-grab active:cursor-grabbing text-lg select-none shrink-0" title="Trage pentru a reordona">⠿</span>
-                                  )}
-                                  {isAdmin && isEditingThis ? (
+                                  {isAdmin && !projectFinalized && <span className="text-gray-300 cursor-grab active:cursor-grabbing text-lg select-none shrink-0">⠿</span>}
+                                  {isAdmin && !projectFinalized && isEditingThis ? (
                                     <div className="flex items-center gap-2 flex-1 min-w-0">
-                                      <input
-                                        className="border border-blue-400 p-1 rounded text-sm text-gray-900 flex-1 min-w-0"
-                                        value={editingCategoryName}
-                                        onChange={(e) => setEditingCategoryName(e.target.value)}
-                                        onKeyDown={(e) => { if (e.key === "Enter") handleSaveEditCategory(cat.id); if (e.key === "Escape") setEditingCategoryId(null); }}
-                                        autoFocus
-                                      />
+                                      <input className="border border-blue-400 p-1 rounded text-sm text-gray-900 flex-1 min-w-0" value={editingCategoryName} onChange={(e) => setEditingCategoryName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleSaveEditCategory(cat.id); if (e.key === "Escape") setEditingCategoryId(null); }} autoFocus />
                                       <button className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-semibold hover:bg-blue-700 whitespace-nowrap" onClick={() => handleSaveEditCategory(cat.id)}>✓</button>
                                       <button className="bg-gray-300 text-gray-700 px-2 py-1 rounded text-xs font-semibold hover:bg-gray-400" onClick={() => setEditingCategoryId(null)}>✕</button>
                                     </div>
                                   ) : (
-                                    <button
-                                      className="flex items-center gap-2 flex-1 text-left min-w-0"
-                                      onClick={() => setCollapsedCategories((prev) => ({ ...prev, [cat.id]: !prev[cat.id] }))}
-                                    >
+                                    <button className="flex items-center gap-2 flex-1 text-left min-w-0" onClick={() => setCollapsedCategories((prev) => ({ ...prev, [cat.id]: !prev[cat.id] }))}>
                                       <span className="font-semibold text-sm text-gray-800 truncate">{cat.name}</span>
                                       <span className="text-xs text-gray-400 shrink-0">({catImages.length} poze)</span>
                                       <span className="text-gray-400 text-xs ml-auto shrink-0">{isCollapsed ? "▼" : "▲"}</span>
                                     </button>
                                   )}
-                                  {isAdmin && !isEditingThis && (
+                                  {isAdmin && !projectFinalized && !isEditingThis && (
                                     <div className="flex items-center gap-1 shrink-0 ml-1">
-                                      <button className="text-gray-400 hover:text-gray-700 font-bold px-1 disabled:opacity-20" onClick={() => moveCategoryUp(catIndex)} disabled={catIndex === 0} title="Mută sus">↑</button>
-                                      <button className="text-gray-400 hover:text-gray-700 font-bold px-1 disabled:opacity-20" onClick={() => moveCategoryDown(catIndex)} disabled={catIndex === montajCategories.length - 1} title="Mută jos">↓</button>
-                                      <button className="text-blue-400 hover:text-blue-600 text-sm font-bold px-1" onClick={() => { setEditingCategoryId(cat.id); setEditingCategoryName(cat.name); }} title="Editează numele">✏️</button>
-                                      <button className="text-red-400 hover:text-red-600 text-sm font-bold px-1" onClick={() => handleDeleteCategory(cat.id)} title="Șterge categoria">✕</button>
+                                      <button className="text-gray-400 hover:text-gray-700 font-bold px-1 disabled:opacity-20" onClick={() => moveCategoryUp(catIndex)} disabled={catIndex === 0}>↑</button>
+                                      <button className="text-gray-400 hover:text-gray-700 font-bold px-1 disabled:opacity-20" onClick={() => moveCategoryDown(catIndex)} disabled={catIndex === montajCategories.length - 1}>↓</button>
+                                      <button className="text-blue-400 hover:text-blue-600 text-sm font-bold px-1" onClick={() => { setEditingCategoryId(cat.id); setEditingCategoryName(cat.name); }}>✏️</button>
+                                      <button className="text-red-400 hover:text-red-600 text-sm font-bold px-1" onClick={() => handleDeleteCategory(cat.id)}>✕</button>
                                     </div>
                                   )}
                                 </div>
-
                                 {!isCollapsed && (
                                   <div className="p-3">
-                                    {!montajSaved && (
+                                    {!montajSaved && !projectFinalized && (
                                       <label className="inline-flex items-center gap-2 cursor-pointer bg-blue-50 border border-blue-200 text-blue-700 px-3 py-2 rounded text-sm font-medium hover:bg-blue-100 transition mb-3">
                                         {uploadingCategory === cat.id ? "⏳ Se încarcă..." : "📷 Adaugă poze"}
                                         <input type="file" accept="image/*" multiple className="hidden" disabled={uploadingCategory !== null}
@@ -866,22 +819,11 @@ export default function ProjectsPage() {
                                       <div className="grid grid-cols-3 gap-2">
                                         {catImages.map((img, i) => (
                                           <div key={img.id} className="relative group">
-                                            <img
-                                              src={img.url} alt=""
-                                              className="rounded border h-28 w-full object-cover cursor-pointer"
-                                              onClick={() => {
-                                                setLightboxImages(catImages.map((ci) => ci.url));
-                                                setActiveIndex(i);
-                                                setLightboxCanDelete(!montajSaved);
-                                                setLightboxCategoryId(cat.id);
-                                                setOpenLightbox(true);
-                                              }}
+                                            <img src={img.url} alt="" className="rounded border h-28 w-full object-cover cursor-pointer"
+                                              onClick={() => { setLightboxImages(catImages.map((ci) => ci.url)); setActiveIndex(i); setLightboxCanDelete(!montajSaved && !projectFinalized); setLightboxCategoryId(cat.id); setOpenLightbox(true); }}
                                             />
-                                            {!montajSaved && (
-                                              <button
-                                                className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-6 h-6 text-xs font-bold opacity-0 group-hover:opacity-100 transition flex items-center justify-center"
-                                                onClick={(e) => { e.stopPropagation(); deleteMontajImage(img.id); }}
-                                              >✕</button>
+                                            {!montajSaved && !projectFinalized && (
+                                              <button className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-6 h-6 text-xs font-bold opacity-0 group-hover:opacity-100 transition flex items-center justify-center" onClick={(e) => { e.stopPropagation(); deleteMontajImage(img.id); }}>✕</button>
                                             )}
                                           </div>
                                         ))}
@@ -894,21 +836,15 @@ export default function ProjectsPage() {
                           })}
                         </div>
                       )}
-
                       <div className="mt-4 flex flex-wrap gap-2 items-center">
-                        {!montajSaved && (
-                          <button className="bg-blue-600 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-blue-700 transition" onClick={handleSaveMontaj}>
-                            💾 Salvează poze montaj
-                          </button>
+                        {!montajSaved && !projectFinalized && (
+                          <button className="bg-blue-600 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-blue-700 transition" onClick={handleSaveMontaj}>💾 Salvează poze montaj</button>
                         )}
                         {montajSaved && <span className="text-sm text-green-700 font-semibold">✅ Poze montaj salvate</span>}
-                        {montajSaved && isAdmin && (
-                          <button className="bg-orange-500 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-orange-600 transition" onClick={handleUnlockMontaj}>
-                            🔓 Deblochează pentru modificare
-                          </button>
+                        {montajSaved && isAdmin && !projectFinalized && (
+                          <button className="bg-orange-500 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-orange-600 transition" onClick={handleUnlockMontaj}>🔓 Deblochează pentru modificare</button>
                         )}
                       </div>
-
                     </div>
                   )}
                 </>
@@ -920,24 +856,22 @@ export default function ProjectsPage() {
                   <button className="w-full text-left font-bold text-gray-900 bg-gray-100 p-3 rounded mt-3 text-base" onClick={() => setShowMaterials(!showMaterials)}>
                     🔧 Materiale folosite {showMaterials ? "▲" : "▼"}
                   </button>
-
                   {showMaterials && (
                     <div className="p-2 mt-1">
-                      {isAdmin && (
+                      {isAdmin && !projectFinalized && (
                         <div className="flex flex-wrap gap-2 mb-4">
                           <input className="border border-gray-300 p-2 rounded text-sm text-gray-900 placeholder-gray-500 flex-1 min-w-[150px]" placeholder="Nume material (ex: Clemă capăt)" value={newMaterialName} onChange={(e) => setNewMaterialName(e.target.value)} />
                           <input className="border border-gray-300 p-2 rounded text-sm text-gray-900 w-24" placeholder="U.M. (buc)" value={newMaterialUnit} onChange={(e) => setNewMaterialUnit(e.target.value)} />
                           <button className="bg-green-600 text-white px-3 py-2 rounded text-sm font-semibold hover:bg-green-700 transition" onClick={handleAddMaterial}>+ Adaugă</button>
                         </div>
                       )}
-
                       {materials.length === 0 ? (
                         <p className="text-sm text-gray-500 italic">{isAdmin ? "Nu există materiale definite. Adaugă primul material mai sus." : "Nu există materiale definite de admin."}</p>
                       ) : (
                         <div className="space-y-2">
                           {materials.map((mat) => (
                             <div key={mat.id} className="flex items-center gap-2 p-2 bg-gray-50 rounded border border-gray-200">
-                              {isAdmin && editingMaterialId === mat.id ? (
+                              {isAdmin && !projectFinalized && editingMaterialId === mat.id ? (
                                 <>
                                   <input className="border border-blue-400 p-1 rounded text-sm text-gray-900 flex-1 min-w-0" value={editingMaterialName} onChange={(e) => setEditingMaterialName(e.target.value)} autoFocus />
                                   <input className="border border-blue-400 p-1 rounded text-sm text-gray-900 w-16" value={editingMaterialUnit} onChange={(e) => setEditingMaterialUnit(e.target.value)} />
@@ -949,9 +883,9 @@ export default function ProjectsPage() {
                                   <span className="flex-1 text-sm font-medium text-gray-800 min-w-0">{mat.name}<span className="text-gray-400 ml-1 text-xs">({mat.unit})</span></span>
                                   <input
                                     type="number" min="0"
-                                    className={`border border-gray-300 p-2 rounded text-sm text-gray-900 w-24 text-center shrink-0 ${materialsSaved && !isAdmin ? "bg-gray-100 text-gray-500 cursor-not-allowed" : "bg-white"}`}
+                                    className={`border border-gray-300 p-2 rounded text-sm text-gray-900 w-24 text-center shrink-0 ${(materialsSaved && !isAdmin) || projectFinalized ? "bg-gray-100 text-gray-500 cursor-not-allowed" : "bg-white"}`}
                                     placeholder="0" value={quantities[mat.id] || ""}
-                                    disabled={materialsSaved && !isAdmin}
+                                    disabled={(materialsSaved && !isAdmin) || projectFinalized}
                                     onChange={(e) => {
                                       const val = e.target.value;
                                       setQuantities((prev) => ({ ...prev, [mat.id]: val }));
@@ -960,7 +894,7 @@ export default function ProjectsPage() {
                                     }}
                                   />
                                   <span className="text-xs text-gray-400 w-8 shrink-0">{mat.unit}</span>
-                                  {isAdmin && (
+                                  {isAdmin && !projectFinalized && (
                                     <>
                                       <button className="text-blue-500 hover:text-blue-700 text-sm font-bold px-1 shrink-0" onClick={() => { setEditingMaterialId(mat.id); setEditingMaterialName(mat.name); setEditingMaterialUnit(mat.unit); }}>✏️</button>
                                       <button className="text-red-500 hover:text-red-700 text-sm font-bold px-1 shrink-0" onClick={() => handleDeleteMaterial(mat.id)}>✕</button>
@@ -972,36 +906,20 @@ export default function ProjectsPage() {
                           ))}
                         </div>
                       )}
-
                       {autoSaving && <p className="text-xs text-gray-400 italic mt-2">⏳ Se salvează automat...</p>}
-
                       {materials.length > 0 && (
                         <div className="mt-4 flex flex-wrap gap-2 items-center">
-                          {!materialsSaved && (
-                            <button className="bg-blue-600 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-blue-700 transition" onClick={handleSaveMaterials}>
-                              💾 Salvează materiale
-                            </button>
+                          {!materialsSaved && !projectFinalized && (
+                            <button className="bg-blue-600 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-blue-700 transition" onClick={handleSaveMaterials}>💾 Salvează materiale</button>
                           )}
                           {materialsSaved && <span className="text-sm text-green-700 font-semibold">✅ Materiale salvate</span>}
-                          {materialsSaved && isAdmin && (
-                            <button className="bg-orange-500 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-orange-600 transition" onClick={handleUnlockMaterials}>
-                              🔓 Deblochează pentru modificare
-                            </button>
+                          {materialsSaved && isAdmin && !projectFinalized && (
+                            <button className="bg-orange-500 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-orange-600 transition" onClick={handleUnlockMaterials}>🔓 Deblochează pentru modificare</button>
                           )}
                           {isAdmin && (
                             <>
-                              <button
-                                className="bg-gray-700 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-gray-800 transition"
-                                onClick={handlePrintMaterials}
-                              >
-                                🖨️ Printează
-                              </button>
-                              <button
-                                className="bg-green-700 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-green-800 transition"
-                                onClick={handleDownloadPDF}
-                              >
-                                ⬇️ Descarcă PDF
-                              </button>
+                              <button className="bg-gray-700 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-gray-800 transition" onClick={handlePrintMaterials}>🖨️ Printează</button>
+                              <button className="bg-green-700 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-green-800 transition" onClick={handleDownloadPDF}>⬇️ Descarcă PDF</button>
                             </>
                           )}
                         </div>
@@ -1015,13 +933,30 @@ export default function ProjectsPage() {
               <div className="flex flex-wrap gap-2 mt-6">
                 <button className="bg-gray-300 text-gray-800 font-semibold px-4 py-3 rounded text-base" onClick={resetForm}>Închide</button>
                 {isAdmin && !selectedProject && <button className="bg-blue-600 text-white font-semibold px-4 py-3 rounded text-base" onClick={handleSave}>Salvează</button>}
-                {isAdmin && selectedProject && (
+                {isAdmin && selectedProject && !projectFinalized && (
                   <>
                     <button className="bg-blue-600 text-white font-semibold px-4 py-3 rounded text-base" onClick={handleUpdate}>Actualizează</button>
                     <button className="bg-red-600 text-white font-semibold px-4 py-3 rounded text-base" onClick={handleDelete}>Șterge</button>
                   </>
                 )}
+                {isAdmin && selectedProject && projectFinalized && (
+                  <button className="bg-orange-500 text-white font-semibold px-4 py-3 rounded text-base hover:bg-orange-600 transition" onClick={handleUnlockProject}>
+                    🔓 Deblochează proiectul
+                  </button>
+                )}
               </div>
+
+              {/* Buton Finalizare */}
+              {selectedProject && !projectFinalized && (
+                <button className="w-full mt-3 bg-green-600 text-white font-bold py-3 rounded-lg text-base hover:bg-green-700 transition" onClick={handleFinalizeProject}>
+                  ✅ Finalizare proiect
+                </button>
+              )}
+              {selectedProject && projectFinalized && (
+                <div className="w-full mt-3 bg-green-50 border border-green-300 text-green-800 font-semibold py-3 rounded-lg text-base text-center">
+                  ✅ Proiect finalizat
+                </div>
+              )}
 
             </div>
           </div>
