@@ -56,7 +56,6 @@ export default function NotificationBell() {
   useEffect(() => {
     loadNotifications();
 
-    // Realtime — notificare nouă apare instant
     const channel = supabase
       .channel("notifications-channel")
       .on(
@@ -68,7 +67,9 @@ export default function NotificationBell() {
       )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // Închide dropdown când dai click în afară
@@ -85,15 +86,22 @@ export default function NotificationBell() {
   const formatTime = (iso: string) => {
     const d = new Date(iso);
     return d.toLocaleString("ro-RO", {
-      day: "2-digit", month: "2-digit", year: "numeric",
-      hour: "2-digit", minute: "2-digit",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
   return (
     <div ref={ref} className="relative">
+      {/* Buton clopoțel */}
       <button
-        onClick={() => { setOpen(!open); if (!open) loadNotifications(); }}
+        onClick={() => {
+          setOpen(!open);
+          if (!open) loadNotifications();
+        }}
         className="relative p-2 rounded-full hover:bg-gray-700 transition"
         title="Notificări"
       >
@@ -106,48 +114,72 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute left-0 md:left-auto md:right-0 mt-2 w-72 md:w-80 bg-white rounded-xl shadow-2xl border border-gray-200 z-[9999] overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-            <span className="font-bold text-gray-900 text-sm">Notificări</span>
-            {unread > 0 && (
-              <button
-                onClick={markAllRead}
-                className="text-xs text-blue-600 hover:underline font-medium"
-              >
-                Marchează toate citite
-              </button>
-            )}
-          </div>
+        <>
+          {/* Overlay închidere pe mobile */}
+          <div
+            className="fixed inset-0 z-[9998] md:hidden"
+            onClick={() => setOpen(false)}
+          />
 
-          <div className="max-h-80 overflow-y-auto">
-            {notifications.length === 0 ? (
-              <p className="text-sm text-gray-400 italic p-4 text-center">
-                Nicio notificare
-              </p>
-            ) : (
-              notifications.map((n) => (
-                <div
-                  key={n.id}
-                  onClick={() => handleNotificationClick(n)}
-                  className={`px-4 py-3 border-b border-gray-50 cursor-pointer hover:bg-gray-50 transition ${
-                    !n.read ? "bg-blue-50" : "bg-white"
-                  }`}
+          {/* Panel notificări */}
+          <div
+            className="
+              fixed left-2 right-2 top-16 z-[9999]
+              md:absolute md:left-auto md:right-0 md:top-auto md:mt-2
+              md:w-80 md:max-w-sm
+              bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden
+            "
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+              <span className="font-bold text-gray-900 text-sm">Notificări</span>
+              {unread > 0 && (
+                <button
+                  onClick={markAllRead}
+                  className="text-xs text-blue-600 hover:underline font-medium"
                 >
-                  <div className="flex items-start gap-2">
-                    <span className="text-base mt-0.5">
-                      {!n.read ? "🔵" : "⚪"}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm text-gray-900">{n.title}</p>
-                      <p className="text-sm text-gray-600 mt-0.5">{n.message}</p>
-                      <p className="text-xs text-gray-400 mt-1">{formatTime(n.created_at)}</p>
+                  Marchează toate citite
+                </button>
+              )}
+            </div>
+
+            {/* Listă notificări */}
+            <div className="max-h-[60vh] md:max-h-80 overflow-y-auto">
+              {notifications.length === 0 ? (
+                <p className="text-sm text-gray-400 italic p-4 text-center">
+                  Nicio notificare
+                </p>
+              ) : (
+                notifications.map((n) => (
+                  <div
+                    key={n.id}
+                    onClick={() => handleNotificationClick(n)}
+                    className={`px-4 py-3 border-b border-gray-50 cursor-pointer hover:bg-gray-50 transition ${
+                      !n.read ? "bg-blue-50" : "bg-white"
+                    }`}
+                  >
+                    <div className="flex items-start gap-2">
+                      <span className="text-base mt-0.5">
+                        {!n.read ? "🔵" : "⚪"}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm text-gray-900">
+                          {n.title}
+                        </p>
+                        <p className="text-sm text-gray-600 mt-0.5">
+                          {n.message}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          {formatTime(n.created_at)}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))
-            )}
+                ))
+              )}
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
