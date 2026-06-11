@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
+import { useRouter } from "next/navigation";
 
 type Notification = {
   id: string;
@@ -16,8 +17,17 @@ export default function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   const unread = notifications.filter((n) => !n.read).length;
+
+  async function handleNotificationClick(n: Notification) {
+    await markOneRead(n.id);
+    setOpen(false);
+    if (n.project_id) {
+      router.push(`/projects?open=${n.project_id}`);
+    }
+  }
 
   async function loadNotifications() {
     const { data } = await supabase
@@ -96,7 +106,7 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 z-[9999] overflow-hidden">
+        <div className="absolute left-0 md:left-auto md:right-0 mt-2 w-72 md:w-80 bg-white rounded-xl shadow-2xl border border-gray-200 z-[9999] overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
             <span className="font-bold text-gray-900 text-sm">Notificări</span>
             {unread > 0 && (
@@ -118,7 +128,7 @@ export default function NotificationBell() {
               notifications.map((n) => (
                 <div
                   key={n.id}
-                  onClick={() => markOneRead(n.id)}
+                  onClick={() => handleNotificationClick(n)}
                   className={`px-4 py-3 border-b border-gray-50 cursor-pointer hover:bg-gray-50 transition ${
                     !n.read ? "bg-blue-50" : "bg-white"
                   }`}
