@@ -34,6 +34,7 @@ type Material = {
   id: string;
   name: string;
   unit: string;
+  role: string;
 };
 
 type ProjectMaterial = {
@@ -57,6 +58,8 @@ type MontajImage = {
   url: string;
   saved: boolean;
 };
+
+type MaterialRole = "montator" | "electrician";
 
 export default function ProjectsPage() {
   return (
@@ -90,10 +93,18 @@ function ProjectsPageInner() {
   const [showMaterials, setShowMaterials] = useState(true);
   const [showMontaj, setShowMontaj] = useState(true);
 
+  // ── MATERIALE — state separat pe rol ──
   const [materials, setMaterials] = useState<Material[]>([]);
   const [projectMaterials, setProjectMaterials] = useState<ProjectMaterial[]>([]);
   const [quantities, setQuantities] = useState<Record<string, string>>({});
-  const [materialsSaved, setMaterialsSaved] = useState(false);
+
+  // saved/unlocked separat pe rol
+  const [materialsSavedMontator, setMaterialsSavedMontator] = useState(false);
+  const [materialsSavedElectrician, setMaterialsSavedElectrician] = useState(false);
+
+  // tab activ in sectiunea Materiale
+  const [activeMaterialRole, setActiveMaterialRole] = useState<MaterialRole>("montator");
+
   const [newMaterialName, setNewMaterialName] = useState("");
   const [newMaterialUnit, setNewMaterialUnit] = useState("buc");
   const [autoSaving, setAutoSaving] = useState(false);
@@ -121,6 +132,12 @@ function ProjectsPageInner() {
     kw: "", battery: "", panels: "", inverter: "", notes: "",
     status: "Programat", roof_images: [], simulation_images: [],
   });
+
+  // ── helpers ──
+  const materialsMontator = materials.filter((m) => m.role === "montator");
+  const materialsElectrician = materials.filter((m) => m.role === "electrician");
+  const activeMaterials = activeMaterialRole === "montator" ? materialsMontator : materialsElectrician;
+  const materialsSaved = activeMaterialRole === "montator" ? materialsSavedMontator : materialsSavedElectrician;
 
   useEffect(() => {
     const check = async () => {
@@ -167,8 +184,28 @@ function ProjectsPageInner() {
     const q: Record<string, string> = {};
     rows.forEach((row) => { q[row.material_id] = row.quantity || ""; });
     setQuantities(q);
-    setMaterialsSaved(rows.some((r) => r.saved === true));
+
+    // saved separat pe fiecare rol
+    // un rol e "saved" daca cel putin un rand saved=true pentru un material din acel rol
+    // vom recalcula dupa ce avem si materials loaded
+    // folosim un flag: daca rows are vreun saved=true il punem, dar diferentiat il facem in useEffect
+    setMaterialsSavedMontator(rows.some((r) => r.saved === true));
+    setMaterialsSavedElectrician(rows.some((r) => r.saved === true));
   }
+
+  // Recalculam saved pe rol dupa ce avem atat materials cat si projectMaterials
+  useEffect(() => {
+    if (materials.length === 0 || projectMaterials.length === 0) return;
+
+    const montatorIds = new Set(materials.filter((m) => m.role === "montator").map((m) => m.id));
+    const electricianIds = new Set(materials.filter((m) => m.role === "electrician").map((m) => m.id));
+
+    const montatorRows = projectMaterials.filter((pm) => montatorIds.has(pm.material_id));
+    const electricianRows = projectMaterials.filter((pm) => electricianIds.has(pm.material_id));
+
+    setMaterialsSavedMontator(montatorRows.some((r) => r.saved === true));
+    setMaterialsSavedElectrician(electricianRows.some((r) => r.saved === true));
+  }, [materials, projectMaterials]);
 
   async function loadMontajCategories() {
     const { data, error } = await supabase.from("montaj_categories").select("*").order("order_index", { ascending: true });
@@ -222,7 +259,9 @@ function ProjectsPageInner() {
     setSelectedDate(null);
     setProjectMaterials([]);
     setQuantities({});
-    setMaterialsSaved(false);
+    setMaterialsSavedMontator(false);
+    setMaterialsSavedElectrician(false);
+    setActiveMaterialRole("montator");
     setMontajImages([]);
     setMontajSaved(false);
     setProjectFinalized(false);
@@ -294,7 +333,7 @@ function ProjectsPageInner() {
   const handleAddMaterial = async () => {
     const name = newMaterialName.trim();
     if (!name) return;
-    const { error } = await supabase.from("materials").insert({ name, unit: newMaterialUnit });
+    const { error } = await supabase.from("materials").insert({ name, unit: newMaterialUnit, role: activeMaterialRole });
     if (error) { alert(error.message); return; }
     setNewMaterialName(""); setNewMaterialUnit("buc");
     await loadMaterials();
@@ -334,28 +373,46 @@ function ProjectsPageInner() {
     [selectedProject]
   );
 
-  const handleSaveMaterials = async () => {
+  const handleSaveMaterials = async (role: MaterialRole) => {
     if (!selectedProject?.id) return;
-    const upsertData = materials.map((m) => ({
+    const roleMaterials = materials.filter((m) => m.role === role);
+    const upsertData = roleMaterials.map((m) => ({
       project_id: selectedProject.id!, material_id: m.id,
       quantity: quantities[m.id] || "", saved: true, saved_at: new Date().toISOString(),
     }));
     const { error } = await supabase.from("project_materials").upsert(upsertData, { onConflict: "project_id,material_id" });
     if (error) { alert("Eroare la salvare: " + error.message); return; }
-    setMaterialsSaved(true);
-    setProjectMaterials((prev) => prev.map((pm) => ({ ...pm, saved: true })));
+    if (role === "montator") setMaterialsSavedMontator(true);
+    else setMaterialsSavedElectrician(true);
+    setProjectMaterials((prev) => prev.map((pm) => {
+      const belongs = roleMaterials.some((m) => m.id === pm.material_id);
+      return belongs ? { ...pm, saved: true } : pm;
+    }));
   };
 
-  const handleUnlockMaterials = async () => {
+  const handleUnlockMaterials = async (role: MaterialRole) => {
     if (!selectedProject?.id) return;
-    await supabase.from("project_materials").update({ saved: false, saved_at: null }).eq("project_id", selectedProject.id);
-    setMaterialsSaved(false);
-    setProjectMaterials((prev) => prev.map((pm) => ({ ...pm, saved: false })));
+    const roleMaterialIds = materials.filter((m) => m.role === role).map((m) => m.id);
+    // update only project_materials rows belonging to this role
+    for (const mid of roleMaterialIds) {
+      const row = projectMaterials.find((pm) => pm.material_id === mid);
+      if (row?.id) {
+        await supabase.from("project_materials").update({ saved: false, saved_at: null }).eq("id", row.id);
+      }
+    }
+    if (role === "montator") setMaterialsSavedMontator(false);
+    else setMaterialsSavedElectrician(false);
+    setProjectMaterials((prev) => prev.map((pm) => {
+      const belongs = roleMaterialIds.includes(pm.material_id);
+      return belongs ? { ...pm, saved: false } : pm;
+    }));
   };
 
-  const handlePrintMaterials = () => {
+  const handlePrintMaterials = (role: MaterialRole) => {
+    const roleMaterials = materials.filter((m) => m.role === role);
+    const roleLabel = role === "montator" ? "Montator" : "Electrician";
     const printContent = `
-      <html><head><title>Materiale — ${form.client} / ${form.title}</title>
+      <html><head><title>Materiale ${roleLabel} — ${form.client} / ${form.title}</title>
       <style>
         body { font-family: Arial, sans-serif; padding: 32px; color: #111; }
         h1 { font-size: 20px; margin-bottom: 4px; }
@@ -367,10 +424,10 @@ function ProjectsPageInner() {
         .qty { font-weight: bold; text-align: center; }
         .empty { color: #aaa; text-align: center; }
       </style></head><body>
-        <h1>Lista materiale — ${form.client || "—"}</h1>
+        <h1>Lista materiale ${roleLabel} — ${form.client || "—"}</h1>
         <p>Proiect: ${form.title || "—"} &nbsp;|&nbsp; Locație: ${form.location || "—"} &nbsp;|&nbsp; Data: ${selectedDate || "—"}</p>
         <table><thead><tr><th>#</th><th>Material</th><th>U.M.</th><th>Cantitate</th></tr></thead>
-        <tbody>${materials.map((mat, i) => `<tr><td>${i + 1}</td><td>${mat.name}</td><td>${mat.unit}</td><td class="${quantities[mat.id] ? "qty" : "empty"}">${quantities[mat.id] || "—"}</td></tr>`).join("")}</tbody>
+        <tbody>${roleMaterials.map((mat, i) => `<tr><td>${i + 1}</td><td>${mat.name}</td><td>${mat.unit}</td><td class="${quantities[mat.id] ? "qty" : "empty"}">${quantities[mat.id] || "—"}</td></tr>`).join("")}</tbody>
         </table></body></html>`;
     const win = window.open("", "_blank");
     if (!win) return;
@@ -380,7 +437,9 @@ function ProjectsPageInner() {
     win.print();
   };
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = (role: MaterialRole) => {
+    const roleMaterials = materials.filter((m) => m.role === role);
+    const roleLabel = role === "montator" ? "Montator" : "Electrician";
     import("jspdf").then(({ jsPDF }) => {
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
       const margin = 15;
@@ -390,7 +449,7 @@ function ProjectsPageInner() {
       const startX = (pageWidth - tableWidth) / 2;
       doc.setFont("helvetica", "bold");
       doc.setFontSize(16);
-      doc.text(`Lista materiale — ${form.client || "—"}`, margin, 20);
+      doc.text(`Lista materiale ${roleLabel} — ${form.client || "—"}`, margin, 20);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
       doc.setTextColor(100);
@@ -405,7 +464,7 @@ function ProjectsPageInner() {
       let x = startX;
       ["#", "Material", "U.M.", "Cantitate"].forEach((h, i) => { doc.text(h, x + 2, y + 6); x += colWidths[i]; });
       doc.setFont("helvetica", "normal");
-      materials.forEach((mat, idx) => {
+      roleMaterials.forEach((mat, idx) => {
         y += rowH;
         if (idx % 2 === 1) { doc.setFillColor(249, 250, 251); doc.rect(startX, y, tableWidth, rowH, "F"); }
         const qty = quantities[mat.id] || "—";
@@ -422,7 +481,7 @@ function ProjectsPageInner() {
       });
       doc.setDrawColor(209, 213, 219);
       doc.rect(startX, 38, tableWidth, rowH);
-      const fileName = `materiale-${(form.client || "proiect").replace(/\s+/g, "-").toLowerCase()}-${selectedDate || "fara-data"}.pdf`;
+      const fileName = `materiale-${roleLabel.toLowerCase()}-${(form.client || "proiect").replace(/\s+/g, "-").toLowerCase()}-${selectedDate || "fara-data"}.pdf`;
       doc.save(fileName);
     });
   };
@@ -604,7 +663,9 @@ function ProjectsPageInner() {
             dateClick={(info) => {
               if (!isAdmin) return;
               setSelectedProject(null); setSelectedDate(info.dateStr);
-              setProjectMaterials([]); setQuantities({}); setMaterialsSaved(false);
+              setProjectMaterials([]); setQuantities({});
+              setMaterialsSavedMontator(false); setMaterialsSavedElectrician(false);
+              setActiveMaterialRole("montator");
               setMontajImages([]); setMontajSaved(false); setProjectFinalized(false);
               setShowClient(true); setShowTechnical(true); setShowRoof(true);
               setShowSimulation(true); setShowMaterials(true); setShowMontaj(true);
@@ -624,6 +685,7 @@ function ProjectsPageInner() {
               setProjectFinalized(p.status === "Finalizat");
               setShowClient(false); setShowTechnical(false); setShowRoof(false);
               setShowSimulation(false); setShowMaterials(false); setShowMontaj(false);
+              setActiveMaterialRole("montator");
               loadProjectMaterials(info.event.id);
               loadMontajImages(info.event.id);
               setOpen(true);
@@ -858,18 +920,47 @@ function ProjectsPageInner() {
                   </button>
                   {showMaterials && (
                     <div className="p-2 mt-1">
+
+                      {/* ── TAB-URI MONTATOR / ELECTRICIAN ── */}
+                      <div className="flex border-b border-gray-200 mb-4">
+                        <button
+                          className={`px-5 py-2 text-sm font-semibold border-b-2 transition-colors ${activeMaterialRole === "montator" ? "border-blue-600 text-blue-700" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                          onClick={() => { setActiveMaterialRole("montator"); setEditingMaterialId(null); }}
+                        >
+                          🔩 Montator
+                        </button>
+                        <button
+                          className={`px-5 py-2 text-sm font-semibold border-b-2 transition-colors ${activeMaterialRole === "electrician" ? "border-yellow-500 text-yellow-700" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                          onClick={() => { setActiveMaterialRole("electrician"); setEditingMaterialId(null); }}
+                        >
+                          ⚡ Electrician
+                        </button>
+                      </div>
+
+                      {/* Adaugă material nou (doar admin, neblocat) */}
                       {isAdmin && !projectFinalized && (
                         <div className="flex flex-wrap gap-2 mb-4">
-                          <input className="border border-gray-300 p-2 rounded text-sm text-gray-900 placeholder-gray-500 flex-1 min-w-[150px]" placeholder="Nume material (ex: Clemă capăt)" value={newMaterialName} onChange={(e) => setNewMaterialName(e.target.value)} />
+                          <input
+                            className="border border-gray-300 p-2 rounded text-sm text-gray-900 placeholder-gray-500 flex-1 min-w-[150px]"
+                            placeholder={`Nume material ${activeMaterialRole === "montator" ? "montator" : "electrician"} (ex: Clemă capăt)`}
+                            value={newMaterialName}
+                            onChange={(e) => setNewMaterialName(e.target.value)}
+                          />
                           <input className="border border-gray-300 p-2 rounded text-sm text-gray-900 w-24" placeholder="U.M. (buc)" value={newMaterialUnit} onChange={(e) => setNewMaterialUnit(e.target.value)} />
                           <button className="bg-green-600 text-white px-3 py-2 rounded text-sm font-semibold hover:bg-green-700 transition" onClick={handleAddMaterial}>+ Adaugă</button>
                         </div>
                       )}
-                      {materials.length === 0 ? (
-                        <p className="text-sm text-gray-500 italic">{isAdmin ? "Nu există materiale definite. Adaugă primul material mai sus." : "Nu există materiale definite de admin."}</p>
+
+                      {/* Lista materiale pentru rolul activ */}
+                      {activeMaterials.length === 0 ? (
+                        <p className="text-sm text-gray-500 italic">
+                          {isAdmin
+                            ? `Nu există materiale pentru ${activeMaterialRole === "montator" ? "Montator" : "Electrician"}. Adaugă primul material mai sus.`
+                            : `Nu există materiale definite pentru ${activeMaterialRole === "montator" ? "Montator" : "Electrician"}.`}
+                        </p>
                       ) : (
                         <div className="space-y-2">
-                          {materials.map((mat) => (
+                          {activeMaterials.map((mat) => (
                             <div key={mat.id} className="flex items-center gap-2 p-2 bg-gray-50 rounded border border-gray-200">
                               {isAdmin && !projectFinalized && editingMaterialId === mat.id ? (
                                 <>
@@ -906,20 +997,31 @@ function ProjectsPageInner() {
                           ))}
                         </div>
                       )}
+
                       {autoSaving && <p className="text-xs text-gray-400 italic mt-2">⏳ Se salvează automat...</p>}
-                      {materials.length > 0 && (
+
+                      {/* Butoane Salvează / Deblochează / Print / PDF — separate pe rol */}
+                      {activeMaterials.length > 0 && (
                         <div className="mt-4 flex flex-wrap gap-2 items-center">
                           {!materialsSaved && !projectFinalized && (
-                            <button className="bg-blue-600 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-blue-700 transition" onClick={handleSaveMaterials}>💾 Salvează materiale</button>
+                            <button className="bg-blue-600 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-blue-700 transition" onClick={() => handleSaveMaterials(activeMaterialRole)}>
+                              💾 Salvează materiale {activeMaterialRole === "montator" ? "Montator" : "Electrician"}
+                            </button>
                           )}
-                          {materialsSaved && <span className="text-sm text-green-700 font-semibold">✅ Materiale salvate</span>}
+                          {materialsSaved && (
+                            <span className="text-sm text-green-700 font-semibold">
+                              ✅ Materiale {activeMaterialRole === "montator" ? "Montator" : "Electrician"} salvate
+                            </span>
+                          )}
                           {materialsSaved && isAdmin && !projectFinalized && (
-                            <button className="bg-orange-500 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-orange-600 transition" onClick={handleUnlockMaterials}>🔓 Deblochează pentru modificare</button>
+                            <button className="bg-orange-500 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-orange-600 transition" onClick={() => handleUnlockMaterials(activeMaterialRole)}>
+                              🔓 Deblochează pentru modificare
+                            </button>
                           )}
                           {isAdmin && (
                             <>
-                              <button className="bg-gray-700 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-gray-800 transition" onClick={handlePrintMaterials}>🖨️ Printează</button>
-                              <button className="bg-green-700 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-green-800 transition" onClick={handleDownloadPDF}>⬇️ Descarcă PDF</button>
+                              <button className="bg-gray-700 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-gray-800 transition" onClick={() => handlePrintMaterials(activeMaterialRole)}>🖨️ Printează</button>
+                              <button className="bg-green-700 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-green-800 transition" onClick={() => handleDownloadPDF(activeMaterialRole)}>⬇️ Descarcă PDF</button>
                             </>
                           )}
                         </div>
