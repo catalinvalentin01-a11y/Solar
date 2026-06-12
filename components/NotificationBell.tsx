@@ -16,6 +16,7 @@ type Notification = {
 export default function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
+  const [panelStyle, setPanelStyle] = useState<React.CSSProperties>({});
   const ref = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -53,6 +54,36 @@ export default function NotificationBell() {
     );
   }
 
+  // Calculează poziția panelului față de buton, ca să nu iasă din ecran
+  function calcPanelStyle() {
+    if (!ref.current) return;
+    const isMobile = window.innerWidth < 768;
+    if (isMobile) {
+      // pe mobile rămâne fixed full-width
+      setPanelStyle({});
+      return;
+    }
+    const rect = ref.current.getBoundingClientRect();
+    const panelWidth = 320;
+    const margin = 8;
+
+    // încearcă aliniere la dreapta butonului
+    let left = rect.right - panelWidth;
+    // dacă iese pe stânga, ancorează la stânga butonului
+    if (left < margin) left = rect.left;
+    // dacă iese pe dreapta, trage înapoi
+    if (left + panelWidth > window.innerWidth - margin) {
+      left = window.innerWidth - panelWidth - margin;
+    }
+
+    setPanelStyle({
+      position: "fixed",
+      top: rect.bottom + 8,
+      left: Math.max(margin, left),
+      width: panelWidth,
+    });
+  }
+
   useEffect(() => {
     loadNotifications();
 
@@ -83,6 +114,14 @@ export default function NotificationBell() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  // Recalculează poziția la resize
+  useEffect(() => {
+    if (!open) return;
+    const handler = () => calcPanelStyle();
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, [open]);
+
   const formatTime = (iso: string) => {
     const d = new Date(iso);
     return d.toLocaleString("ro-RO", {
@@ -94,14 +133,21 @@ export default function NotificationBell() {
     });
   };
 
+  const handleToggle = () => {
+    const next = !open;
+    setOpen(next);
+    if (next) {
+      loadNotifications();
+      // mic delay ca ref-ul să fie randat
+      setTimeout(() => calcPanelStyle(), 0);
+    }
+  };
+
   return (
     <div ref={ref} className="relative">
       {/* Buton clopoțel */}
       <button
-        onClick={() => {
-          setOpen(!open);
-          if (!open) loadNotifications();
-        }}
+        onClick={handleToggle}
         className="relative p-2 rounded-full hover:bg-gray-700 transition"
         title="Notificări"
       >
@@ -121,14 +167,19 @@ export default function NotificationBell() {
             onClick={() => setOpen(false)}
           />
 
-          {/* Panel notificări */}
+          {/* Panel notificări — mobile: fixed full-width, desktop: poziționat calculat */}
           <div
             className="
               fixed left-2 right-2 top-16 z-[9999]
-              md:absolute md:left-auto md:right-0 md:top-auto md:mt-2
-              md:w-80 md:max-w-sm
+              md:left-auto md:right-auto md:top-auto
               bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden
             "
+            style={
+              // pe desktop aplicăm stilul calculat dinamic
+              Object.keys(panelStyle).length > 0
+                ? { ...panelStyle, zIndex: 9999 }
+                : undefined
+            }
           >
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
