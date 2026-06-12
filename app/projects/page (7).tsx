@@ -486,6 +486,159 @@ function ProjectsPageInner() {
     });
   };
 
+  const handlePrintTotal = () => {
+    const montatorMats = materials.filter((m) => m.role === "montator");
+    const electricianMats = materials.filter((m) => m.role === "electrician");
+
+    const buildTable = (mats: Material[]) =>
+      mats.length === 0
+        ? `<p style="color:#aaa;font-style:italic;font-size:13px;">Nu există materiale.</p>`
+        : `<table><thead><tr><th>#</th><th>Material</th><th>U.M.</th><th>Cantitate</th></tr></thead>
+           <tbody>${mats.map((mat, i) => `<tr><td>${i + 1}</td><td>${mat.name}</td><td>${mat.unit}</td><td class="${quantities[mat.id] ? "qty" : "empty"}">${quantities[mat.id] || "—"}</td></tr>`).join("")}</tbody></table>`;
+
+    const printContent = `
+      <html><head><title>Materiale Total — ${form.client} / ${form.title}</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 32px; color: #111; }
+        h1 { font-size: 20px; margin-bottom: 4px; }
+        h2 { font-size: 15px; margin: 24px 0 8px 0; color: #1d4ed8; border-bottom: 2px solid #1d4ed8; padding-bottom: 4px; }
+        h2.electrician { color: #b45309; border-color: #b45309; }
+        p.meta { font-size: 13px; color: #555; margin-bottom: 24px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+        th { background: #f3f4f6; text-align: left; padding: 10px 12px; font-size: 13px; border: 1px solid #e5e7eb; }
+        td { padding: 10px 12px; font-size: 13px; border: 1px solid #e5e7eb; }
+        tr:nth-child(even) td { background: #f9fafb; }
+        .qty { font-weight: bold; text-align: center; }
+        .empty { color: #aaa; text-align: center; }
+      </style></head><body>
+        <h1>Lista materiale — ${form.client || "—"}</h1>
+        <p class="meta">Proiect: ${form.title || "—"} &nbsp;|&nbsp; Locație: ${form.location || "—"} &nbsp;|&nbsp; Data: ${selectedDate || "—"}</p>
+        <h2>🔩 Montator</h2>
+        ${buildTable(montatorMats)}
+        <h2 class="electrician">⚡ Electrician</h2>
+        ${buildTable(electricianMats)}
+      </body></html>`;
+
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(printContent);
+    win.document.close();
+    win.focus();
+    win.print();
+  };
+
+  const handleDownloadPDFTotal = () => {
+    const montatorMats = materials.filter((m) => m.role === "montator");
+    const electricianMats = materials.filter((m) => m.role === "electrician");
+
+    import("jspdf").then(({ jsPDF }) => {
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const margin = 15;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const colWidths = [10, 100, 25, 35];
+      const tableWidth = colWidths.reduce((a, b) => a + b, 0);
+      const startX = (pageWidth - tableWidth) / 2;
+      const rowH = 9;
+
+      // ── Header document ──
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.text(`Lista materiale — ${form.client || "—"}`, margin, 20);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text(`Proiect: ${form.title || "—"}   |   Locație: ${form.location || "—"}   |   Data: ${selectedDate || "—"}`, margin, 28);
+      doc.setTextColor(0);
+
+      const drawTable = (mats: Material[], startY: number): number => {
+        let y = startY;
+        // header tabel
+        doc.setFillColor(243, 244, 246);
+        doc.rect(startX, y, tableWidth, rowH, "F");
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10);
+        let x = startX;
+        ["#", "Material", "U.M.", "Cantitate"].forEach((h, i) => { doc.text(h, x + 2, y + 6); x += colWidths[i]; });
+        doc.setDrawColor(209, 213, 219);
+        doc.rect(startX, y, tableWidth, rowH);
+
+        doc.setFont("helvetica", "normal");
+        mats.forEach((mat, idx) => {
+          y += rowH;
+          // page break
+          if (y + rowH > pageHeight - margin) {
+            doc.addPage();
+            y = margin;
+          }
+          if (idx % 2 === 1) { doc.setFillColor(249, 250, 251); doc.rect(startX, y, tableWidth, rowH, "F"); }
+          const qty = quantities[mat.id] || "—";
+          x = startX;
+          [`${idx + 1}`, mat.name, mat.unit, qty].forEach((cell, i) => {
+            if (i === 3 && quantities[mat.id]) doc.setFont("helvetica", "bold"); else doc.setFont("helvetica", "normal");
+            const maxW = colWidths[i] - 4;
+            const truncated = doc.getTextWidth(cell) > maxW ? cell.substring(0, Math.floor(cell.length * maxW / doc.getTextWidth(cell)) - 2) + "…" : cell;
+            doc.text(truncated, x + 2, y + 6);
+            x += colWidths[i];
+          });
+          doc.setDrawColor(229, 231, 235);
+          doc.rect(startX, y, tableWidth, rowH);
+        });
+
+        return y + rowH; // returnează Y-ul după ultimul rând
+      };
+
+      // ── Secțiunea Montator ──
+      let y = 36;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.setTextColor(29, 78, 216); // albastru
+      doc.text("Montator", margin, y);
+      doc.setDrawColor(29, 78, 216);
+      doc.line(margin, y + 1, pageWidth - margin, y + 1);
+      doc.setTextColor(0);
+      y += 6;
+
+      if (montatorMats.length === 0) {
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(10);
+        doc.setTextColor(150);
+        doc.text("Nu există materiale.", margin, y + 6);
+        doc.setTextColor(0);
+        y += 14;
+      } else {
+        y = drawTable(montatorMats, y);
+      }
+
+      // ── Secțiunea Electrician ──
+      y += 8;
+      // page break dacă nu mai e loc
+      if (y + 30 > pageHeight - margin) { doc.addPage(); y = margin; }
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.setTextColor(180, 83, 9); // portocaliu/amber
+      doc.text("Electrician", margin, y);
+      doc.setDrawColor(180, 83, 9);
+      doc.line(margin, y + 1, pageWidth - margin, y + 1);
+      doc.setTextColor(0);
+      y += 6;
+
+      if (electricianMats.length === 0) {
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(10);
+        doc.setTextColor(150);
+        doc.text("Nu există materiale.", margin, y + 6);
+        doc.setTextColor(0);
+      } else {
+        drawTable(electricianMats, y);
+      }
+
+      const fileName = `materiale-total-${(form.client || "proiect").replace(/\s+/g, "-").toLowerCase()}-${selectedDate || "fara-data"}.pdf`;
+      doc.save(fileName);
+    });
+  };
+
   // ── POZE MONTAJ ──────────────────────────────────────────────
 
   const handleAddCategory = async () => {
@@ -1022,6 +1175,9 @@ function ProjectsPageInner() {
                             <>
                               <button className="bg-gray-700 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-gray-800 transition" onClick={() => handlePrintMaterials(activeMaterialRole)}>🖨️ Printează</button>
                               <button className="bg-green-700 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-green-800 transition" onClick={() => handleDownloadPDF(activeMaterialRole)}>⬇️ Descarcă PDF</button>
+                              <div className="w-full sm:w-px sm:h-6 h-px bg-gray-300 my-1 sm:my-0" />
+                              <button className="bg-gray-900 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-black transition" onClick={handlePrintTotal}>🖨️ Printează Total</button>
+                              <button className="bg-green-900 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-green-950 transition" onClick={handleDownloadPDFTotal}>⬇️ Descarcă PDF Total</button>
                             </>
                           )}
                         </div>
