@@ -652,7 +652,11 @@ function ProjectsPageInner() {
   const uploadMontajImage = async (file: File, categoryId: string) => {
     if (!selectedProject?.id) return;
     setUploadingCategory(categoryId);
-    const fileName = `montaj/${Date.now()}-${file.name}`;
+    const safeName = file.name
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .replace(/[^a-zA-Z0-9._-]/g, "-");
+const fileName = `montaj/${Date.now()}-${safeName}`;
     const { error } = await supabase.storage.from("project-images").upload(fileName, file);
     if (error) { console.error(error); setUploadingCategory(null); return; }
     const { data } = supabase.storage.from("project-images").getPublicUrl(fileName);
@@ -709,7 +713,11 @@ function ProjectsPageInner() {
   };
 
   const uploadImage = async (file: File, target: "roof" | "simulation") => {
-    const fileName = Date.now() + "-" + file.name;
+    const safeName = file.name
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "")  // scoate diacritice
+  .replace(/[^a-zA-Z0-9._-]/g, "-"); // înlocuiește caractere speciale cu -
+const fileName = Date.now() + "-" + safeName;
     const { error } = await supabase.storage.from("project-images").upload(fileName, file);
     if (error) { console.error(error); return; }
     const { data } = supabase.storage.from("project-images").getPublicUrl(fileName);
