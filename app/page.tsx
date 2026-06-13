@@ -1,9 +1,34 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 export default function Page() {
+  const [stats, setStats] = useState({ active: 0, finalized: 0, todayCount: 0, total: 0 });
+  const [loading, setLoading] = useState(true);
+
   const today = new Date().toLocaleDateString("ro-RO", {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
   });
+  const todayStr = new Date().toLocaleDateString("en-CA");
+
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase.from("projects").select("status, date");
+      if (!data) return;
+      setStats({
+        active: data.filter((p) => p.status === "În lucru" || p.status === "Programat").length,
+        finalized: data.filter((p) => p.status === "Finalizat").length,
+        todayCount: data.filter((p) => p.date === todayStr).length,
+        total: data.length,
+      });
+      setLoading(false);
+    };
+    load();
+  }, []);
+
+  const val = (n: number) => loading ? "—" : String(n);
 
   return (
     <div className="p-4 md:p-8">
@@ -23,22 +48,22 @@ export default function Page() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <div className="bg-[#0a1628] border border-[#1e3a5f] rounded-xl p-4">
           <p className="text-xs text-slate-500 font-medium uppercase tracking-widest mb-2">Proiecte active</p>
-          <p className="text-2xl font-bold text-blue-400">—</p>
+          <p className="text-2xl font-bold text-blue-400">{val(stats.active)}</p>
           <p className="text-xs text-slate-500 mt-1">în desfășurare</p>
         </div>
         <div className="bg-[#0a1628] border border-[#1e3a5f] rounded-xl p-4">
           <p className="text-xs text-slate-500 font-medium uppercase tracking-widest mb-2">Finalizate</p>
-          <p className="text-2xl font-bold text-green-400">—</p>
+          <p className="text-2xl font-bold text-green-400">{val(stats.finalized)}</p>
           <p className="text-xs text-slate-500 mt-1">total</p>
         </div>
         <div className="bg-[#0a1628] border border-[#1e3a5f] rounded-xl p-4">
           <p className="text-xs text-slate-500 font-medium uppercase tracking-widest mb-2">Montaje azi</p>
-          <p className="text-2xl font-bold text-yellow-400">—</p>
+          <p className="text-2xl font-bold text-yellow-400">{val(stats.todayCount)}</p>
           <p className="text-xs text-slate-500 mt-1">programate</p>
         </div>
         <div className="bg-[#0a1628] border border-[#1e3a5f] rounded-xl p-4">
           <p className="text-xs text-slate-500 font-medium uppercase tracking-widest mb-2">Total proiecte</p>
-          <p className="text-2xl font-bold text-slate-300">—</p>
+          <p className="text-2xl font-bold text-slate-300">{val(stats.total)}</p>
           <p className="text-xs text-slate-500 mt-1">înregistrate</p>
         </div>
       </div>
@@ -52,19 +77,13 @@ export default function Page() {
           Acces rapid
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Link
-            href="/projects"
-            className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm transition"
-          >
+          <Link href="/projects" className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm transition">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
             </svg>
             Proiecte
           </Link>
-          <Link
-            href="/today"
-            className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm transition"
-          >
+          <Link href="/today" className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-500 text-white font-semibold px-4 py-2.5 rounded-xl text-sm transition">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
             </svg>
@@ -77,7 +96,7 @@ export default function Page() {
       <div className="bg-[#0a1628] border border-[#1e3a5f] rounded-xl p-5">
         <div className="flex items-center gap-2 text-sm font-semibold text-slate-300 mb-3">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
           </svg>
           Despre Solar Blu CRM
         </div>
