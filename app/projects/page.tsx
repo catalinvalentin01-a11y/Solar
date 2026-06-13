@@ -314,8 +314,6 @@ function ProjectsPageInner() {
     await loadProjects();
   };
 
-  // ── MATERIALE ──────────────────────────────────────────────
-
   const handleAddMaterial = async () => {
     const name = newMaterialName.trim();
     if (!name) return;
@@ -580,8 +578,6 @@ function ProjectsPageInner() {
     });
   };
 
-  // ── POZE MONTAJ ──────────────────────────────────────────────
-
   const handleAddCategory = async () => {
     const name = newCategoryName.trim();
     if (!name) return;
@@ -653,10 +649,10 @@ function ProjectsPageInner() {
     if (!selectedProject?.id) return;
     setUploadingCategory(categoryId);
     const safeName = file.name
-  .normalize("NFD")
-  .replace(/[\u0300-\u036f]/g, "")
-  .replace(/[^a-zA-Z0-9._-]/g, "-");
-const fileName = `montaj/${Date.now()}-${safeName}`;
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9._-]/g, "-");
+    const fileName = `montaj/${Date.now()}-${safeName}`;
     const { error } = await supabase.storage.from("project-images").upload(fileName, file);
     if (error) { console.error(error); setUploadingCategory(null); return; }
     const { data } = supabase.storage.from("project-images").getPublicUrl(fileName);
@@ -714,10 +710,10 @@ const fileName = `montaj/${Date.now()}-${safeName}`;
 
   const uploadImage = async (file: File, target: "roof" | "simulation") => {
     const safeName = file.name
-  .normalize("NFD")
-  .replace(/[\u0300-\u036f]/g, "")  // scoate diacritice
-  .replace(/[^a-zA-Z0-9._-]/g, "-"); // înlocuiește caractere speciale cu -
-const fileName = Date.now() + "-" + safeName;
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9._-]/g, "-");
+    const fileName = Date.now() + "-" + safeName;
     const { error } = await supabase.storage.from("project-images").upload(fileName, file);
     if (error) { console.error(error); return; }
     const { data } = supabase.storage.from("project-images").getPublicUrl(fileName);
@@ -730,7 +726,6 @@ const fileName = Date.now() + "-" + safeName;
     if (location) window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`, "_blank");
   };
 
-  // ── STATUS BADGE ──
   const statusBadge = (status: string) => {
     if (status === "Finalizat") return "bg-green-500/20 text-green-400 border border-green-500/30";
     if (status === "În lucru") return "bg-blue-500/20 text-blue-400 border border-blue-500/30";
@@ -741,7 +736,6 @@ const fileName = Date.now() + "-" + safeName;
     <AuthGuard>
       <div className="p-2 md:p-6">
         <style>{`
-          /* ── FullCalendar Solar Blu dark theme ── */
           .fc { -webkit-font-smoothing: antialiased; font-size: 14px; }
           .fc table { border-collapse: collapse; }
           .fc td, .fc th { border-width: 1px !important; border-color: #1e2a3a !important; }
@@ -775,13 +769,9 @@ const fileName = Date.now() + "-" + safeName;
             .fc .fc-event-title { font-size: 10px !important; }
           }
           .drag-over { outline: 2px dashed #3b82f6 !important; outline-offset: -2px; background: #112236 !important; }
-
-          /* ── Modal scrollbar ── */
           .sb-modal::-webkit-scrollbar { width: 6px; }
           .sb-modal::-webkit-scrollbar-track { background: #0a1628; }
           .sb-modal::-webkit-scrollbar-thumb { background: #1e3a5f; border-radius: 3px; }
-
-          /* ── Input autofill dark fix ── */
           input:-webkit-autofill,
           input:-webkit-autofill:hover,
           input:-webkit-autofill:focus {
@@ -790,7 +780,6 @@ const fileName = Date.now() + "-" + safeName;
           }
         `}</style>
 
-        {/* ── Calendar wrapper ── */}
         <div className="overflow-x-auto rounded-xl border border-[#1e2a3a] shadow-2xl">
           <FullCalendar
             plugins={[dayGridPlugin, interactionPlugin]}
@@ -831,19 +820,14 @@ const fileName = Date.now() + "-" + safeName;
           />
         </div>
 
-        {/* ── MODAL ── */}
         {open && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center">
-            {/* Backdrop */}
             <div className="fixed inset-0 bg-black/75 backdrop-blur-sm" onClick={() => setOpen(false)} />
 
-            {/* Panel */}
             <div className="sb-modal relative bg-[#0d1b2a] rounded-2xl border border-[#1e3a5f] w-[95vw] md:w-[900px] max-h-[90vh] overflow-y-auto z-[10000] shadow-[0_0_60px_rgba(37,99,235,0.15)]">
 
-              {/* ── Header ── */}
               <div className="sticky top-0 z-10 flex justify-between items-center px-5 py-4 bg-[#0a1628] border-b border-[#1e3a5f] rounded-t-2xl">
                 <div className="flex items-center gap-3">
-                  {/* Solar Blu mini logo */}
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#facc15] to-[#f59e0b] flex items-center justify-center shadow-[0_0_12px_rgba(250,204,21,0.4)]">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                       <circle cx="12" cy="12" r="5" fill="#0a1628"/>
@@ -877,7 +861,6 @@ const fileName = Date.now() + "-" + safeName;
 
               <div className="p-4 md:p-5 space-y-3">
 
-                {/* ── Quick actions ── */}
                 {selectedProject && (form.phone || form.location) && (
                   <div className="flex flex-wrap gap-2 pb-1">
                     {form.phone && (
@@ -899,7 +882,6 @@ const fileName = Date.now() + "-" + safeName;
                   </div>
                 )}
 
-                {/* ── Section helper ── */}
                 {(() => {
                   const sectionHeader = (icon: string, label: string, open: boolean, toggle: () => void) => (
                     <button
@@ -923,7 +905,6 @@ const fileName = Date.now() + "-" + safeName;
 
                   return (
                     <>
-                      {/* DATE CLIENT */}
                       {sectionHeader("📋", "Date Client", showClient, () => setShowClient(!showClient))}
                       {showClient && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 px-1">
@@ -945,7 +926,6 @@ const fileName = Date.now() + "-" + safeName;
                         </div>
                       )}
 
-                      {/* DATE TEHNICE */}
                       {sectionHeader("⚡", "Date Tehnice", showTechnical, () => setShowTechnical(!showTechnical))}
                       {showTechnical && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 px-1">
@@ -986,7 +966,6 @@ const fileName = Date.now() + "-" + safeName;
                         </div>
                       )}
 
-                      {/* POZE ACOPERIS */}
                       {sectionHeader("🏠", "Poze Acoperiș", showRoof, () => setShowRoof(!showRoof))}
                       {showRoof && (
                         <div className="px-1">
@@ -1005,7 +984,6 @@ const fileName = Date.now() + "-" + safeName;
                         </div>
                       )}
 
-                      {/* SIMULARE */}
                       {sectionHeader("☀️", "Simulare Panouri", showSimulation, () => setShowSimulation(!showSimulation))}
                       {showSimulation && (
                         <div className="px-1">
@@ -1027,7 +1005,6 @@ const fileName = Date.now() + "-" + safeName;
                   );
                 })()}
 
-                {/* ── POZE MONTAJ ── */}
                 {selectedProject && (
                   <>
                     <button
@@ -1100,7 +1077,8 @@ const fileName = Date.now() + "-" + safeName;
                                         className="flex items-center gap-2 flex-1 text-left min-w-0"
                                         onClick={() => setCollapsedCategories((prev) => ({ ...prev, [cat.id]: !prev[cat.id] }))}
                                       >
-                                        <span className="font-semibold text-sm text-slate-200 truncate">{cat.name}</span>
+                                        {/* ✅ FIX: înlocuit truncate cu break-words */}
+                                        <span className="font-semibold text-sm text-slate-200 break-words min-w-0">{cat.name}</span>
                                         <span className="text-xs text-slate-500 shrink-0">({catImages.length} poze)</span>
                                         <span className="text-blue-500 text-xs ml-auto shrink-0">{isCollapsed ? "▼" : "▲"}</span>
                                       </button>
@@ -1176,7 +1154,6 @@ const fileName = Date.now() + "-" + safeName;
                   </>
                 )}
 
-                {/* ── MATERIALE ── */}
                 {selectedProject && (
                   <>
                     <button
@@ -1188,8 +1165,6 @@ const fileName = Date.now() + "-" + safeName;
                     </button>
                     {showMaterials && (
                       <div className="px-1 space-y-3">
-
-                        {/* Tab-uri Montator / Electrician */}
                         <div className="flex border-b border-[#1e3a5f]">
                           <button
                             className={`px-5 py-2.5 text-sm font-semibold border-b-2 transition-colors ${activeMaterialRole === "montator" ? "border-blue-500 text-blue-400" : "border-transparent text-slate-500 hover:text-slate-300"}`}
@@ -1205,7 +1180,6 @@ const fileName = Date.now() + "-" + safeName;
                           </button>
                         </div>
 
-                        {/* Adaugă material */}
                         {isAdmin && !projectFinalized && (
                           <div className="flex flex-wrap gap-2">
                             <input
@@ -1229,7 +1203,6 @@ const fileName = Date.now() + "-" + safeName;
                           </div>
                         )}
 
-                        {/* Lista materiale */}
                         {activeMaterials.length === 0 ? (
                           <p className="text-sm text-slate-500 italic">
                             {isAdmin
@@ -1282,7 +1255,6 @@ const fileName = Date.now() + "-" + safeName;
 
                         {autoSaving && <p className="text-xs text-slate-500 italic">⏳ Se salvează automat...</p>}
 
-                        {/* Butoane salvare / print / PDF */}
                         {activeMaterials.length > 0 && (
                           <div className="flex flex-wrap gap-2 items-center pt-1">
                             {!materialsSaved && !projectFinalized && (
@@ -1322,7 +1294,6 @@ const fileName = Date.now() + "-" + safeName;
                   </>
                 )}
 
-                {/* ── Footer butoane ── */}
                 <div className="flex flex-wrap gap-2 pt-4 border-t border-[#1e3a5f]">
                   <button
                     className="bg-[#1e3a5f] hover:bg-[#2a4a6f] text-slate-300 font-semibold px-5 py-2.5 rounded-xl text-sm transition"
@@ -1355,7 +1326,6 @@ const fileName = Date.now() + "-" + safeName;
                   )}
                 </div>
 
-                {/* ── Buton Finalizare ── */}
                 {selectedProject && !projectFinalized && (
                   <button
                     className="w-full bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white font-bold py-3 rounded-xl text-sm transition shadow-lg shadow-green-900/30"
