@@ -95,7 +95,7 @@ export default function AdminPage() {
             {pending.map((r) => (
               <div key={r.id} className="flex items-center justify-between border rounded-xl p-4">
                 <div>
-                 <p className="font-medium text-white">{r.email}</p>
+                  <p className="font-medium text-white">{r.email}</p>
                   <p className="text-sm text-gray-400">
                     {new Date(r.created_at).toLocaleDateString("ro-RO")}
                   </p>
@@ -128,9 +128,10 @@ export default function AdminPage() {
           </h2>
           <div className="flex flex-col gap-3">
             {admins.map((r) => (
+              // fundal galben deschis → text închis
               <div key={r.id} className="flex items-center justify-between border border-yellow-300 bg-yellow-50 rounded-xl p-4">
                 <div>
-                  <p className="font-medium text-white">{r.email}</p>
+                  <p className="font-medium text-gray-900">{r.email}</p>
                   {r.email === SUPER_ADMIN && (
                     <p className="text-xs text-yellow-600">Super admin</p>
                   )}
@@ -157,7 +158,7 @@ export default function AdminPage() {
                   <p className="font-medium text-white">{r.email}</p>
                   <button
                     onClick={() => toggleAdmin(r.id, r.is_admin, r.email)}
-                    className="bg-yellow-500 text-white px-3 py-1.5 rounded-lg text-sm font-semibold"
+                    className="bg-yellow-500 text-gray-900 px-3 py-1.5 rounded-lg text-sm font-semibold"
                   >
                     Fă admin
                   </button>
