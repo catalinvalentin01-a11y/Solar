@@ -93,16 +93,13 @@ function ProjectsPageInner() {
   const [showMaterials, setShowMaterials] = useState(true);
   const [showMontaj, setShowMontaj] = useState(true);
 
-  // ── MATERIALE — state separat pe rol ──
   const [materials, setMaterials] = useState<Material[]>([]);
   const [projectMaterials, setProjectMaterials] = useState<ProjectMaterial[]>([]);
   const [quantities, setQuantities] = useState<Record<string, string>>({});
 
-  // saved/unlocked separat pe rol
   const [materialsSavedMontator, setMaterialsSavedMontator] = useState(false);
   const [materialsSavedElectrician, setMaterialsSavedElectrician] = useState(false);
 
-  // tab activ in sectiunea Materiale
   const [activeMaterialRole, setActiveMaterialRole] = useState<MaterialRole>("montator");
 
   const [newMaterialName, setNewMaterialName] = useState("");
@@ -133,7 +130,6 @@ function ProjectsPageInner() {
     status: "Programat", roof_images: [], simulation_images: [],
   });
 
-  // ── helpers ──
   const materialsMontator = materials.filter((m) => m.role === "montator");
   const materialsElectrician = materials.filter((m) => m.role === "electrician");
   const activeMaterials = activeMaterialRole === "montator" ? materialsMontator : materialsElectrician;
@@ -184,25 +180,16 @@ function ProjectsPageInner() {
     const q: Record<string, string> = {};
     rows.forEach((row) => { q[row.material_id] = row.quantity || ""; });
     setQuantities(q);
-
-    // saved separat pe fiecare rol
-    // un rol e "saved" daca cel putin un rand saved=true pentru un material din acel rol
-    // vom recalcula dupa ce avem si materials loaded
-    // folosim un flag: daca rows are vreun saved=true il punem, dar diferentiat il facem in useEffect
     setMaterialsSavedMontator(rows.some((r) => r.saved === true));
     setMaterialsSavedElectrician(rows.some((r) => r.saved === true));
   }
 
-  // Recalculam saved pe rol dupa ce avem atat materials cat si projectMaterials
   useEffect(() => {
     if (materials.length === 0 || projectMaterials.length === 0) return;
-
     const montatorIds = new Set(materials.filter((m) => m.role === "montator").map((m) => m.id));
     const electricianIds = new Set(materials.filter((m) => m.role === "electrician").map((m) => m.id));
-
     const montatorRows = projectMaterials.filter((pm) => montatorIds.has(pm.material_id));
     const electricianRows = projectMaterials.filter((pm) => electricianIds.has(pm.material_id));
-
     setMaterialsSavedMontator(montatorRows.some((r) => r.saved === true));
     setMaterialsSavedElectrician(electricianRows.some((r) => r.saved === true));
   }, [materials, projectMaterials]);
@@ -227,7 +214,6 @@ function ProjectsPageInner() {
     loadMontajCategories();
   }, []);
 
-  // Auto-deschide proiectul dacă vine din Today (?open=ID)
   useEffect(() => {
     const openId = searchParams.get("open");
     if (!openId) return;
@@ -393,7 +379,6 @@ function ProjectsPageInner() {
   const handleUnlockMaterials = async (role: MaterialRole) => {
     if (!selectedProject?.id) return;
     const roleMaterialIds = materials.filter((m) => m.role === role).map((m) => m.id);
-    // update only project_materials rows belonging to this role
     for (const mid of roleMaterialIds) {
       const row = projectMaterials.find((pm) => pm.material_id === mid);
       if (row?.id) {
@@ -489,13 +474,11 @@ function ProjectsPageInner() {
   const handlePrintTotal = () => {
     const montatorMats = materials.filter((m) => m.role === "montator");
     const electricianMats = materials.filter((m) => m.role === "electrician");
-
     const buildTable = (mats: Material[]) =>
       mats.length === 0
         ? `<p style="color:#aaa;font-style:italic;font-size:13px;">Nu există materiale.</p>`
         : `<table><thead><tr><th>#</th><th>Material</th><th>U.M.</th><th>Cantitate</th></tr></thead>
            <tbody>${mats.map((mat, i) => `<tr><td>${i + 1}</td><td>${mat.name}</td><td>${mat.unit}</td><td class="${quantities[mat.id] ? "qty" : "empty"}">${quantities[mat.id] || "—"}</td></tr>`).join("")}</tbody></table>`;
-
     const printContent = `
       <html><head><title>Materiale Total — ${form.client} / ${form.title}</title>
       <style>
@@ -513,12 +496,9 @@ function ProjectsPageInner() {
       </style></head><body>
         <h1>Lista materiale — ${form.client || "—"}</h1>
         <p class="meta">Proiect: ${form.title || "—"} &nbsp;|&nbsp; Locație: ${form.location || "—"} &nbsp;|&nbsp; Data: ${selectedDate || "—"}</p>
-        <h2>🔩 Montator</h2>
-        ${buildTable(montatorMats)}
-        <h2 class="electrician">⚡ Electrician</h2>
-        ${buildTable(electricianMats)}
+        <h2>🔩 Montator</h2>${buildTable(montatorMats)}
+        <h2 class="electrician">⚡ Electrician</h2>${buildTable(electricianMats)}
       </body></html>`;
-
     const win = window.open("", "_blank");
     if (!win) return;
     win.document.write(printContent);
@@ -530,7 +510,6 @@ function ProjectsPageInner() {
   const handleDownloadPDFTotal = () => {
     const montatorMats = materials.filter((m) => m.role === "montator");
     const electricianMats = materials.filter((m) => m.role === "electrician");
-
     import("jspdf").then(({ jsPDF }) => {
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
       const margin = 15;
@@ -540,8 +519,6 @@ function ProjectsPageInner() {
       const tableWidth = colWidths.reduce((a, b) => a + b, 0);
       const startX = (pageWidth - tableWidth) / 2;
       const rowH = 9;
-
-      // ── Header document ──
       doc.setFont("helvetica", "bold");
       doc.setFontSize(16);
       doc.text(`Lista materiale — ${form.client || "—"}`, margin, 20);
@@ -550,10 +527,8 @@ function ProjectsPageInner() {
       doc.setTextColor(100);
       doc.text(`Proiect: ${form.title || "—"}   |   Locație: ${form.location || "—"}   |   Data: ${selectedDate || "—"}`, margin, 28);
       doc.setTextColor(0);
-
       const drawTable = (mats: Material[], startY: number): number => {
         let y = startY;
-        // header tabel
         doc.setFillColor(243, 244, 246);
         doc.rect(startX, y, tableWidth, rowH, "F");
         doc.setFont("helvetica", "bold");
@@ -562,15 +537,10 @@ function ProjectsPageInner() {
         ["#", "Material", "U.M.", "Cantitate"].forEach((h, i) => { doc.text(h, x + 2, y + 6); x += colWidths[i]; });
         doc.setDrawColor(209, 213, 219);
         doc.rect(startX, y, tableWidth, rowH);
-
         doc.setFont("helvetica", "normal");
         mats.forEach((mat, idx) => {
           y += rowH;
-          // page break
-          if (y + rowH > pageHeight - margin) {
-            doc.addPage();
-            y = margin;
-          }
+          if (y + rowH > pageHeight - margin) { doc.addPage(); y = margin; }
           if (idx % 2 === 1) { doc.setFillColor(249, 250, 251); doc.rect(startX, y, tableWidth, rowH, "F"); }
           const qty = quantities[mat.id] || "—";
           x = startX;
@@ -584,56 +554,27 @@ function ProjectsPageInner() {
           doc.setDrawColor(229, 231, 235);
           doc.rect(startX, y, tableWidth, rowH);
         });
-
-        return y + rowH; // returnează Y-ul după ultimul rând
+        return y + rowH;
       };
-
-      // ── Secțiunea Montator ──
       let y = 36;
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      doc.setTextColor(29, 78, 216); // albastru
+      doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(29, 78, 216);
       doc.text("Montator", margin, y);
-      doc.setDrawColor(29, 78, 216);
-      doc.line(margin, y + 1, pageWidth - margin, y + 1);
-      doc.setTextColor(0);
-      y += 6;
-
+      doc.setDrawColor(29, 78, 216); doc.line(margin, y + 1, pageWidth - margin, y + 1);
+      doc.setTextColor(0); y += 6;
       if (montatorMats.length === 0) {
-        doc.setFont("helvetica", "italic");
-        doc.setFontSize(10);
-        doc.setTextColor(150);
-        doc.text("Nu există materiale.", margin, y + 6);
-        doc.setTextColor(0);
-        y += 14;
-      } else {
-        y = drawTable(montatorMats, y);
-      }
-
-      // ── Secțiunea Electrician ──
+        doc.setFont("helvetica", "italic"); doc.setFontSize(10); doc.setTextColor(150);
+        doc.text("Nu există materiale.", margin, y + 6); doc.setTextColor(0); y += 14;
+      } else { y = drawTable(montatorMats, y); }
       y += 8;
-      // page break dacă nu mai e loc
       if (y + 30 > pageHeight - margin) { doc.addPage(); y = margin; }
-
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      doc.setTextColor(180, 83, 9); // portocaliu/amber
+      doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(180, 83, 9);
       doc.text("Electrician", margin, y);
-      doc.setDrawColor(180, 83, 9);
-      doc.line(margin, y + 1, pageWidth - margin, y + 1);
-      doc.setTextColor(0);
-      y += 6;
-
+      doc.setDrawColor(180, 83, 9); doc.line(margin, y + 1, pageWidth - margin, y + 1);
+      doc.setTextColor(0); y += 6;
       if (electricianMats.length === 0) {
-        doc.setFont("helvetica", "italic");
-        doc.setFontSize(10);
-        doc.setTextColor(150);
-        doc.text("Nu există materiale.", margin, y + 6);
-        doc.setTextColor(0);
-      } else {
-        drawTable(electricianMats, y);
-      }
-
+        doc.setFont("helvetica", "italic"); doc.setFontSize(10); doc.setTextColor(150);
+        doc.text("Nu există materiale.", margin, y + 6); doc.setTextColor(0);
+      } else { drawTable(electricianMats, y); }
       const fileName = `materiale-total-${(form.client || "proiect").replace(/\s+/g, "-").toLowerCase()}-${selectedDate || "fara-data"}.pdf`;
       doc.save(fileName);
     });
@@ -781,32 +722,68 @@ function ProjectsPageInner() {
     if (location) window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`, "_blank");
   };
 
+  // ── STATUS BADGE ──
+  const statusBadge = (status: string) => {
+    if (status === "Finalizat") return "bg-green-500/20 text-green-400 border border-green-500/30";
+    if (status === "În lucru") return "bg-blue-500/20 text-blue-400 border border-blue-500/30";
+    return "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30";
+  };
+
   return (
     <AuthGuard>
       <div className="p-2 md:p-6">
         <style>{`
-          .fc { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; font-size: 14px; }
+          /* ── FullCalendar Solar Blu dark theme ── */
+          .fc { -webkit-font-smoothing: antialiased; font-size: 14px; }
           .fc table { border-collapse: collapse; }
-          .fc td, .fc th { border-width: 1px !important; }
-          .fc .fc-scrollgrid { transform: translateZ(0); backface-visibility: hidden; }
-          .fc .fc-daygrid-day-number { font-size: 14px !important; font-weight: 600 !important; color: #111827 !important; padding: 4px 6px !important; }
-          .fc .fc-col-header-cell-cushion { font-size: 13px !important; font-weight: 700 !important; color: #111827 !important; padding: 6px 4px !important; }
-          .fc .fc-toolbar-title { font-size: 16px !important; font-weight: 700 !important; color: #111827 !important; }
-          .fc .fc-button { font-size: 13px !important; font-weight: 600 !important; padding: 5px 10px !important; }
-          .fc .fc-event-title { font-size: 12px !important; font-weight: 600 !important; }
-          .fc .fc-day-today { background-color: #eff6ff !important; }
-          .fc .fc-day-today .fc-daygrid-day-number { color: #1d4ed8 !important; }
+          .fc td, .fc th { border-width: 1px !important; border-color: #1e2a3a !important; }
+          .fc .fc-scrollgrid { transform: translateZ(0); backface-visibility: hidden; background: #0d1b2a; border-color: #1e2a3a !important; }
+          .fc .fc-scrollgrid-section > td { border-color: #1e2a3a !important; }
+          .fc-theme-standard .fc-scrollgrid { border-color: #1e2a3a !important; }
+          .fc .fc-daygrid-day { background: #0d1b2a; }
+          .fc .fc-daygrid-day:hover { background: #112236; }
+          .fc .fc-daygrid-day-number { font-size: 14px !important; font-weight: 600 !important; color: #94a3b8 !important; padding: 4px 6px !important; }
+          .fc .fc-col-header-cell { background: #0a1628 !important; }
+          .fc .fc-col-header-cell-cushion { font-size: 12px !important; font-weight: 700 !important; color: #3b82f6 !important; padding: 8px 4px !important; text-transform: uppercase; letter-spacing: 0.05em; text-decoration: none !important; }
+          .fc .fc-toolbar { background: #0a1628; padding: 10px 4px; border-radius: 8px 8px 0 0; margin-bottom: 0 !important; }
+          .fc .fc-toolbar-title { font-size: 16px !important; font-weight: 700 !important; color: #e2e8f0 !important; }
+          .fc .fc-button { font-size: 12px !important; font-weight: 600 !important; padding: 5px 12px !important; background: #1e3a5f !important; border-color: #2563eb !important; color: #93c5fd !important; border-radius: 6px !important; }
+          .fc .fc-button:hover { background: #2563eb !important; color: #fff !important; }
+          .fc .fc-button-primary:not(:disabled).fc-button-active { background: #2563eb !important; color: #fff !important; }
+          .fc .fc-event { background: linear-gradient(135deg, #1d4ed8, #2563eb) !important; border: none !important; border-radius: 4px !important; padding: 1px 4px !important; }
+          .fc .fc-event-title { font-size: 11px !important; font-weight: 600 !important; color: #fff !important; }
+          .fc .fc-day-today { background-color: #0f2744 !important; }
+          .fc .fc-day-today .fc-daygrid-day-number { color: #60a5fa !important; font-weight: 800 !important; }
+          .fc .fc-daygrid-day-number { text-decoration: none !important; }
+          .fc a { color: inherit !important; }
+          .fc .fc-popover { background: #0d1b2a !important; border-color: #1e3a5f !important; }
+          .fc .fc-popover-title { background: #0a1628 !important; color: #e2e8f0 !important; }
+          .fc .fc-popover-body { background: #0d1b2a !important; color: #e2e8f0 !important; }
           @media (max-width: 640px) {
-            .fc .fc-toolbar-title { font-size: 15px !important; }
+            .fc .fc-toolbar-title { font-size: 14px !important; }
             .fc .fc-toolbar { gap: 6px !important; }
-            .fc .fc-daygrid-day-number { font-size: 13px !important; }
-            .fc .fc-col-header-cell-cushion { font-size: 11px !important; }
-            .fc .fc-event-title { font-size: 11px !important; }
+            .fc .fc-daygrid-day-number { font-size: 12px !important; }
+            .fc .fc-col-header-cell-cushion { font-size: 10px !important; }
+            .fc .fc-event-title { font-size: 10px !important; }
           }
-          .drag-over { outline: 2px dashed #3b82f6; outline-offset: -2px; background: #eff6ff; }
+          .drag-over { outline: 2px dashed #3b82f6 !important; outline-offset: -2px; background: #112236 !important; }
+
+          /* ── Modal scrollbar ── */
+          .sb-modal::-webkit-scrollbar { width: 6px; }
+          .sb-modal::-webkit-scrollbar-track { background: #0a1628; }
+          .sb-modal::-webkit-scrollbar-thumb { background: #1e3a5f; border-radius: 3px; }
+
+          /* ── Input autofill dark fix ── */
+          input:-webkit-autofill,
+          input:-webkit-autofill:hover,
+          input:-webkit-autofill:focus {
+            -webkit-box-shadow: 0 0 0 1000px #0d2137 inset !important;
+            -webkit-text-fill-color: #e2e8f0 !important;
+          }
         `}</style>
 
-        <div className="overflow-x-auto">
+        {/* ── Calendar wrapper ── */}
+        <div className="overflow-x-auto rounded-xl border border-[#1e2a3a] shadow-2xl">
           <FullCalendar
             plugins={[dayGridPlugin, interactionPlugin]}
             initialView="dayGridMonth"
@@ -846,376 +823,546 @@ function ProjectsPageInner() {
           />
         </div>
 
+        {/* ── MODAL ── */}
         {open && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center">
-            <div className="fixed inset-0 bg-black/60" onClick={() => setOpen(false)} />
-            <div className="relative bg-white rounded-lg p-4 w-[95vw] md:w-[900px] max-h-[90vh] overflow-y-auto z-[10000]">
+            {/* Backdrop */}
+            <div className="fixed inset-0 bg-black/75 backdrop-blur-sm" onClick={() => setOpen(false)} />
 
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="font-bold text-xl text-gray-900">{selectedProject ? "Detalii proiect" : "Proiect nou"}</h2>
-                <span className="text-sm font-semibold text-gray-600">{selectedDate}</span>
+            {/* Panel */}
+            <div className="sb-modal relative bg-[#0d1b2a] rounded-2xl border border-[#1e3a5f] w-[95vw] md:w-[900px] max-h-[90vh] overflow-y-auto z-[10000] shadow-[0_0_60px_rgba(37,99,235,0.15)]">
+
+              {/* ── Header ── */}
+              <div className="sticky top-0 z-10 flex justify-between items-center px-5 py-4 bg-[#0a1628] border-b border-[#1e3a5f] rounded-t-2xl">
+                <div className="flex items-center gap-3">
+                  {/* Solar Blu mini logo */}
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#facc15] to-[#f59e0b] flex items-center justify-center shadow-[0_0_12px_rgba(250,204,21,0.4)]">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="5" fill="#0a1628"/>
+                      <g stroke="#0a1628" strokeWidth="2" strokeLinecap="round">
+                        <line x1="12" y1="2" x2="12" y2="5"/>
+                        <line x1="12" y1="19" x2="12" y2="22"/>
+                        <line x1="2" y1="12" x2="5" y2="12"/>
+                        <line x1="19" y1="12" x2="22" y2="12"/>
+                        <line x1="4.93" y1="4.93" x2="7.05" y2="7.05"/>
+                        <line x1="16.95" y1="16.95" x2="19.07" y2="19.07"/>
+                        <line x1="4.93" y1="19.07" x2="7.05" y2="16.95"/>
+                        <line x1="16.95" y1="7.05" x2="19.07" y2="4.93"/>
+                      </g>
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 className="font-bold text-lg text-white leading-tight">
+                      {selectedProject ? "Detalii proiect" : "Proiect nou"}
+                    </h2>
+                    {selectedDate && (
+                      <p className="text-xs text-blue-400 font-medium">{selectedDate}</p>
+                    )}
+                  </div>
+                </div>
+                {form.status && selectedProject && (
+                  <span className={`text-xs font-semibold px-3 py-1 rounded-full ${statusBadge(form.status)}`}>
+                    {form.status}
+                  </span>
+                )}
               </div>
 
-              {selectedProject && (
-                <div className="flex flex-wrap gap-3 mb-4">
-                  {form.phone && (
-                    <button className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition text-sm" onClick={() => handleCall(form.phone)}>
-                      📞 Sună — {form.phone}
-                    </button>
-                  )}
-                  {form.location && (
-                    <button className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition text-sm" onClick={() => handleMaps(form.location)}>
-                      📍 GPS — {form.location}
-                    </button>
-                  )}
-                </div>
-              )}
+              <div className="p-4 md:p-5 space-y-3">
 
-              {/* Date Client */}
-              <button className="w-full text-left font-bold text-gray-900 bg-gray-100 p-3 rounded text-base" onClick={() => setShowClient(!showClient)}>
-                📋 Date Client {showClient ? "▲" : "▼"}
-              </button>
-              {showClient && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-2 mt-1">
-                  {isAdmin && !projectFinalized ? (
-                    <>
-                      <input className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500" placeholder="Client" value={form.client} onChange={(e) => setForm({ ...form, client: e.target.value })} />
-                      <input className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500" placeholder="Telefon" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-                      <input className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-                      <input className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500" placeholder="Locație" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
-                    </>
-                  ) : (
-                    <>
-                      <div className="p-2 bg-gray-50 rounded"><p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Client</p><p className="font-semibold text-gray-900 text-base mt-1">{form.client || "—"}</p></div>
-                      <div className="p-2 bg-gray-50 rounded"><p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Telefon</p><p className="font-semibold text-gray-900 text-base mt-1">{form.phone || "—"}</p></div>
-                      <div className="p-2 bg-gray-50 rounded"><p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Email</p><p className="font-semibold text-gray-900 text-base mt-1">{form.email || "—"}</p></div>
-                      <div className="p-2 bg-gray-50 rounded"><p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Locație</p><p className="font-semibold text-gray-900 text-base mt-1">{form.location || "—"}</p></div>
-                    </>
-                  )}
-                </div>
-              )}
-
-              {/* Date Tehnice */}
-              <button className="w-full text-left font-bold text-gray-900 bg-gray-100 p-3 rounded mt-3 text-base" onClick={() => setShowTechnical(!showTechnical)}>
-                ⚡ Date Tehnice {showTechnical ? "▲" : "▼"}
-              </button>
-              {showTechnical && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-2 mt-1">
-                  {isAdmin && !projectFinalized ? (
-                    <>
-                      <input className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500" placeholder="Titlu proiect" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-                      <input className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500" placeholder="kW" value={form.kw} onChange={(e) => setForm({ ...form, kw: e.target.value })} />
-                      <input className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500" placeholder="Panouri" value={form.panels} onChange={(e) => setForm({ ...form, panels: e.target.value })} />
-                      <input className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500" placeholder="Invertor" value={form.inverter} onChange={(e) => setForm({ ...form, inverter: e.target.value })} />
-                      <input className="border border-gray-300 p-3 rounded text-base text-gray-900 placeholder-gray-500" placeholder="Baterie" value={form.battery} onChange={(e) => setForm({ ...form, battery: e.target.value })} />
-                      <select className="border border-gray-300 p-3 rounded text-base text-gray-900" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-                        <option>Programat</option><option>În lucru</option><option>Finalizat</option>
-                      </select>
-                      <textarea className="border border-gray-300 p-3 rounded col-span-1 sm:col-span-2 text-base text-gray-900 placeholder-gray-500" placeholder="Observații" rows={4} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-                    </>
-                  ) : (
-                    <>
-                      <div className="p-2 bg-gray-50 rounded"><p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Titlu proiect</p><p className="font-semibold text-gray-900 text-base mt-1">{form.title || "—"}</p></div>
-                      <div className="p-2 bg-gray-50 rounded"><p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">kW</p><p className="font-semibold text-gray-900 text-base mt-1">{form.kw || "—"}</p></div>
-                      <div className="p-2 bg-gray-50 rounded"><p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Panouri</p><p className="font-semibold text-gray-900 text-base mt-1">{form.panels || "—"}</p></div>
-                      <div className="p-2 bg-gray-50 rounded"><p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Invertor</p><p className="font-semibold text-gray-900 text-base mt-1">{form.inverter || "—"}</p></div>
-                      <div className="p-2 bg-gray-50 rounded"><p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Baterie</p><p className="font-semibold text-gray-900 text-base mt-1">{form.battery || "—"}</p></div>
-                      <div className="p-2 bg-gray-50 rounded"><p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</p><p className="font-semibold text-gray-900 text-base mt-1">{form.status || "—"}</p></div>
-                      <div className="p-2 bg-gray-50 rounded col-span-1 sm:col-span-2"><p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Observații</p><p className="font-semibold text-gray-900 text-base mt-1 whitespace-pre-wrap">{form.notes || "—"}</p></div>
-                    </>
-                  )}
-                </div>
-              )}
-
-              {/* Poze Acoperis */}
-              <button className="w-full text-left font-bold text-gray-900 bg-gray-100 p-3 rounded mt-3 text-base" onClick={() => setShowRoof(!showRoof)}>
-                🏠 Poze Acoperiș {showRoof ? "▲" : "▼"}
-              </button>
-              {showRoof && (
-                <div className="p-2 mt-1">
-                  {isAdmin && !projectFinalized && <input type="file" accept="image/*" className="mb-3 text-sm text-gray-700" onChange={async (e) => { const file = e.target.files?.[0]; if (file) await uploadImage(file, "roof"); }} />}
-                  <div className="grid grid-cols-3 gap-2">
-                    {form.roof_images.map((img, i) => (
-                      <img key={img} src={img} alt="" onClick={() => { setLightboxImages(form.roof_images); setActiveIndex(i); setLightboxCanDelete(isAdmin && !projectFinalized); setLightboxCategoryId(null); setOpenLightbox(true); }} className="rounded border h-28 w-full object-cover cursor-pointer" />
-                    ))}
+                {/* ── Quick actions ── */}
+                {selectedProject && (form.phone || form.location) && (
+                  <div className="flex flex-wrap gap-2 pb-1">
+                    {form.phone && (
+                      <button
+                        className="flex items-center gap-2 bg-green-500/10 border border-green-500/30 text-green-400 px-4 py-2 rounded-lg font-medium hover:bg-green-500/20 transition text-sm"
+                        onClick={() => handleCall(form.phone)}
+                      >
+                        📞 {form.phone}
+                      </button>
+                    )}
+                    {form.location && (
+                      <button
+                        className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/30 text-blue-400 px-4 py-2 rounded-lg font-medium hover:bg-blue-500/20 transition text-sm"
+                        onClick={() => handleMaps(form.location)}
+                      >
+                        📍 {form.location}
+                      </button>
+                    )}
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Simulare */}
-              <button className="w-full text-left font-bold text-gray-900 bg-gray-100 p-3 rounded mt-3 text-base" onClick={() => setShowSimulation(!showSimulation)}>
-                ☀️ Simulare Panouri {showSimulation ? "▲" : "▼"}
-              </button>
-              {showSimulation && (
-                <div className="p-2 mt-1">
-                  {isAdmin && !projectFinalized && <input type="file" accept="image/*" className="mb-3 text-sm text-gray-700" onChange={async (e) => { const file = e.target.files?.[0]; if (file) await uploadImage(file, "simulation"); }} />}
-                  <div className="grid grid-cols-3 gap-2">
-                    {form.simulation_images.map((img, i) => (
-                      <img key={img} src={img} alt="" onClick={() => { setLightboxImages(form.simulation_images); setActiveIndex(i); setLightboxCanDelete(isAdmin && !projectFinalized); setLightboxCategoryId(null); setOpenLightbox(true); }} className="rounded border h-28 w-full object-cover cursor-pointer" />
-                    ))}
-                  </div>
-                </div>
-              )}
+                {/* ── Section helper ── */}
+                {(() => {
+                  const sectionHeader = (icon: string, label: string, open: boolean, toggle: () => void) => (
+                    <button
+                      className="w-full text-left flex items-center justify-between px-4 py-3 rounded-xl bg-[#0a1628] border border-[#1e3a5f] hover:border-blue-500/50 hover:bg-[#0f2235] transition-all text-sm font-semibold text-slate-300"
+                      onClick={toggle}
+                    >
+                      <span className="flex items-center gap-2">{icon} {label}</span>
+                      <span className="text-blue-500 text-xs">{open ? "▲" : "▼"}</span>
+                    </button>
+                  );
 
-              {/* ── POZE MONTAJ ── */}
-              {selectedProject && (
-                <>
-                  <button className="w-full text-left font-bold text-gray-900 bg-gray-100 p-3 rounded mt-3 text-base" onClick={() => setShowMontaj(!showMontaj)}>
-                    📸 Poze Montaj {showMontaj ? "▲" : "▼"}
-                  </button>
-                  {showMontaj && (
-                    <div className="p-2 mt-1">
-                      {isAdmin && !projectFinalized && (
-                        <div className="flex gap-2 mb-4">
-                          <input className="border border-gray-300 p-2 rounded text-sm text-gray-900 placeholder-gray-500 flex-1" placeholder="Nume categorie (ex: Poze panouri)" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleAddCategory(); }} />
-                          <button className="bg-green-600 text-white px-3 py-2 rounded text-sm font-semibold hover:bg-green-700 transition whitespace-nowrap" onClick={handleAddCategory}>+ Categorie</button>
-                        </div>
-                      )}
-                      {isAdmin && montajCategories.length > 1 && (
-                        <p className="text-xs text-gray-400 italic mb-2">💡 Trage categoriile pentru a le reordona, sau folosește săgețile ↑↓</p>
-                      )}
-                      {montajCategories.length === 0 ? (
-                        <p className="text-sm text-gray-500 italic">{isAdmin ? "Nu există categorii. Adaugă prima categorie mai sus." : "Nu există categorii de poze definite."}</p>
-                      ) : (
-                        <div className="space-y-3">
-                          {montajCategories.map((cat, catIndex) => {
-                            const catImages = montajImages.filter((img) => img.category_id === cat.id);
-                            const isCollapsed = collapsedCategories[cat.id] ?? false;
-                            const isEditingThis = editingCategoryId === cat.id;
-                            return (
-                              <div key={cat.id} className="border border-gray-200 rounded-lg overflow-hidden transition-all"
-                                draggable={isAdmin && !projectFinalized}
-                                onDragStart={() => handleDragStart(cat.id)}
-                                onDragOver={(e) => { handleDragOver(e, cat.id); (e.currentTarget as HTMLElement).classList.add("drag-over"); }}
-                                onDragLeave={(e) => (e.currentTarget as HTMLElement).classList.remove("drag-over")}
-                                onDrop={(e) => { (e.currentTarget as HTMLElement).classList.remove("drag-over"); handleDrop(); }}
-                              >
-                                <div className="flex items-center bg-gray-50 px-3 py-2 gap-2">
-                                  {isAdmin && !projectFinalized && <span className="text-gray-300 cursor-grab active:cursor-grabbing text-lg select-none shrink-0">⠿</span>}
-                                  {isAdmin && !projectFinalized && isEditingThis ? (
-                                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                                      <input className="border border-blue-400 p-1 rounded text-sm text-gray-900 flex-1 min-w-0" value={editingCategoryName} onChange={(e) => setEditingCategoryName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleSaveEditCategory(cat.id); if (e.key === "Escape") setEditingCategoryId(null); }} autoFocus />
-                                      <button className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-semibold hover:bg-blue-700 whitespace-nowrap" onClick={() => handleSaveEditCategory(cat.id)}>✓</button>
-                                      <button className="bg-gray-300 text-gray-700 px-2 py-1 rounded text-xs font-semibold hover:bg-gray-400" onClick={() => setEditingCategoryId(null)}>✕</button>
-                                    </div>
-                                  ) : (
-                                    <button className="flex items-center gap-2 flex-1 text-left min-w-0" onClick={() => setCollapsedCategories((prev) => ({ ...prev, [cat.id]: !prev[cat.id] }))}>
-                                      <span className="font-semibold text-sm text-gray-800 truncate">{cat.name}</span>
-                                      <span className="text-xs text-gray-400 shrink-0">({catImages.length} poze)</span>
-                                      <span className="text-gray-400 text-xs ml-auto shrink-0">{isCollapsed ? "▼" : "▲"}</span>
-                                    </button>
-                                  )}
-                                  {isAdmin && !projectFinalized && !isEditingThis && (
-                                    <div className="flex items-center gap-1 shrink-0 ml-1">
-                                      <button className="text-gray-400 hover:text-gray-700 font-bold px-1 disabled:opacity-20" onClick={() => moveCategoryUp(catIndex)} disabled={catIndex === 0}>↑</button>
-                                      <button className="text-gray-400 hover:text-gray-700 font-bold px-1 disabled:opacity-20" onClick={() => moveCategoryDown(catIndex)} disabled={catIndex === montajCategories.length - 1}>↓</button>
-                                      <button className="text-blue-400 hover:text-blue-600 text-sm font-bold px-1" onClick={() => { setEditingCategoryId(cat.id); setEditingCategoryName(cat.name); }}>✏️</button>
-                                      <button className="text-red-400 hover:text-red-600 text-sm font-bold px-1" onClick={() => handleDeleteCategory(cat.id)}>✕</button>
-                                    </div>
-                                  )}
-                                </div>
-                                {!isCollapsed && (
-                                  <div className="p-3">
-                                    {!montajSaved && !projectFinalized && (
-                                      <label className="inline-flex items-center gap-2 cursor-pointer bg-blue-50 border border-blue-200 text-blue-700 px-3 py-2 rounded text-sm font-medium hover:bg-blue-100 transition mb-3">
-                                        {uploadingCategory === cat.id ? "⏳ Se încarcă..." : "📷 Adaugă poze"}
-                                        <input type="file" accept="image/*" multiple className="hidden" disabled={uploadingCategory !== null}
-                                          onChange={async (e) => {
-                                            const files = Array.from(e.target.files || []);
-                                            for (const file of files) await uploadMontajImage(file, cat.id);
-                                            e.target.value = "";
-                                          }}
-                                        />
-                                      </label>
-                                    )}
-                                    {catImages.length === 0 ? (
-                                      <p className="text-xs text-gray-400 italic">Nu există poze în această categorie.</p>
-                                    ) : (
-                                      <div className="grid grid-cols-3 gap-2">
-                                        {catImages.map((img, i) => (
-                                          <div key={img.id} className="relative group">
-                                            <img src={img.url} alt="" className="rounded border h-28 w-full object-cover cursor-pointer"
-                                              onClick={() => { setLightboxImages(catImages.map((ci) => ci.url)); setActiveIndex(i); setLightboxCanDelete(!montajSaved && !projectFinalized); setLightboxCategoryId(cat.id); setOpenLightbox(true); }}
-                                            />
-                                            {!montajSaved && !projectFinalized && (
-                                              <button className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-6 h-6 text-xs font-bold opacity-0 group-hover:opacity-100 transition flex items-center justify-center" onClick={(e) => { e.stopPropagation(); deleteMontajImage(img.id); }}>✕</button>
-                                            )}
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                      <div className="mt-4 flex flex-wrap gap-2 items-center">
-                        {!montajSaved && !projectFinalized && (
-                          <button className="bg-blue-600 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-blue-700 transition" onClick={handleSaveMontaj}>💾 Salvează poze montaj</button>
-                        )}
-                        {montajSaved && <span className="text-sm text-green-700 font-semibold">✅ Poze montaj salvate</span>}
-                        {montajSaved && isAdmin && !projectFinalized && (
-                          <button className="bg-orange-500 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-orange-600 transition" onClick={handleUnlockMontaj}>🔓 Deblochează pentru modificare</button>
-                        )}
-                      </div>
+                  const fieldDisplay = (label: string, value: string, colSpan?: boolean) => (
+                    <div className={`p-3 bg-[#0a1628] rounded-xl border border-[#1e3a5f] ${colSpan ? "col-span-1 sm:col-span-2" : ""}`}>
+                      <p className="text-[10px] font-bold text-blue-400/70 uppercase tracking-widest mb-1">{label}</p>
+                      <p className="font-semibold text-slate-200 text-sm leading-relaxed">{value || "—"}</p>
                     </div>
-                  )}
-                </>
-              )}
+                  );
 
-              {/* ── MATERIALE FOLOSITE ── */}
-              {selectedProject && (
-                <>
-                  <button className="w-full text-left font-bold text-gray-900 bg-gray-100 p-3 rounded mt-3 text-base" onClick={() => setShowMaterials(!showMaterials)}>
-                    🔧 Materiale folosite {showMaterials ? "▲" : "▼"}
-                  </button>
-                  {showMaterials && (
-                    <div className="p-2 mt-1">
+                  const inputClass = "bg-[#0d2137] border border-[#1e3a5f] focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 p-3 rounded-xl text-sm text-slate-200 placeholder-slate-500 outline-none transition w-full";
+                  const selectClass = "bg-[#0d2137] border border-[#1e3a5f] focus:border-blue-500 p-3 rounded-xl text-sm text-slate-200 outline-none transition w-full";
 
-                      {/* ── TAB-URI MONTATOR / ELECTRICIAN ── */}
-                      <div className="flex border-b border-gray-200 mb-4">
-                        <button
-                          className={`px-5 py-2 text-sm font-semibold border-b-2 transition-colors ${activeMaterialRole === "montator" ? "border-blue-600 text-blue-700" : "border-transparent text-gray-500 hover:text-gray-700"}`}
-                          onClick={() => { setActiveMaterialRole("montator"); setEditingMaterialId(null); }}
-                        >
-                          🔩 Montator
-                        </button>
-                        <button
-                          className={`px-5 py-2 text-sm font-semibold border-b-2 transition-colors ${activeMaterialRole === "electrician" ? "border-yellow-500 text-yellow-700" : "border-transparent text-gray-500 hover:text-gray-700"}`}
-                          onClick={() => { setActiveMaterialRole("electrician"); setEditingMaterialId(null); }}
-                        >
-                          ⚡ Electrician
-                        </button>
-                      </div>
-
-                      {/* Adaugă material nou (doar admin, neblocat) */}
-                      {isAdmin && !projectFinalized && (
-                        <div className="flex flex-wrap gap-2 mb-4">
-                          <input
-                            className="border border-gray-300 p-2 rounded text-sm text-gray-900 placeholder-gray-500 flex-1 min-w-[150px]"
-                            placeholder={`Nume material ${activeMaterialRole === "montator" ? "montator" : "electrician"} (ex: Clemă capăt)`}
-                            value={newMaterialName}
-                            onChange={(e) => setNewMaterialName(e.target.value)}
-                          />
-                          <input className="border border-gray-300 p-2 rounded text-sm text-gray-900 w-24" placeholder="U.M. (buc)" value={newMaterialUnit} onChange={(e) => setNewMaterialUnit(e.target.value)} />
-                          <button className="bg-green-600 text-white px-3 py-2 rounded text-sm font-semibold hover:bg-green-700 transition" onClick={handleAddMaterial}>+ Adaugă</button>
-                        </div>
-                      )}
-
-                      {/* Lista materiale pentru rolul activ */}
-                      {activeMaterials.length === 0 ? (
-                        <p className="text-sm text-gray-500 italic">
-                          {isAdmin
-                            ? `Nu există materiale pentru ${activeMaterialRole === "montator" ? "Montator" : "Electrician"}. Adaugă primul material mai sus.`
-                            : `Nu există materiale definite pentru ${activeMaterialRole === "montator" ? "Montator" : "Electrician"}.`}
-                        </p>
-                      ) : (
-                        <div className="space-y-2">
-                          {activeMaterials.map((mat) => (
-                            <div key={mat.id} className="flex items-center gap-2 p-2 bg-gray-50 rounded border border-gray-200">
-                              {isAdmin && !projectFinalized && editingMaterialId === mat.id ? (
-                                <>
-                                  <input className="border border-blue-400 p-1 rounded text-sm text-gray-900 flex-1 min-w-0" value={editingMaterialName} onChange={(e) => setEditingMaterialName(e.target.value)} autoFocus />
-                                  <input className="border border-blue-400 p-1 rounded text-sm text-gray-900 w-16" value={editingMaterialUnit} onChange={(e) => setEditingMaterialUnit(e.target.value)} />
-                                  <button className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-semibold hover:bg-blue-700 whitespace-nowrap" onClick={() => handleSaveEditMaterial(mat.id)}>✓ Salvează</button>
-                                  <button className="bg-gray-300 text-gray-700 px-2 py-1 rounded text-xs font-semibold hover:bg-gray-400" onClick={() => setEditingMaterialId(null)}>✕</button>
-                                </>
-                              ) : (
-                                <>
-                                  <span className="flex-1 text-sm font-medium text-gray-800 min-w-0">{mat.name}<span className="text-gray-400 ml-1 text-xs">({mat.unit})</span></span>
-                                  <input
-                                    type="number" min="0"
-                                    className={`border border-gray-300 p-2 rounded text-sm text-gray-900 w-24 text-center shrink-0 ${(materialsSaved && !isAdmin) || projectFinalized ? "bg-gray-100 text-gray-500 cursor-not-allowed" : "bg-white"}`}
-                                    placeholder="0" value={quantities[mat.id] || ""}
-                                    disabled={(materialsSaved && !isAdmin) || projectFinalized}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      setQuantities((prev) => ({ ...prev, [mat.id]: val }));
-                                      if (debounceRef.current) clearTimeout(debounceRef.current);
-                                      debounceRef.current = setTimeout(() => autoSaveQuantity(mat.id, val, projectMaterials), 1000);
-                                    }}
-                                  />
-                                  <span className="text-xs text-gray-400 w-8 shrink-0">{mat.unit}</span>
-                                  {isAdmin && !projectFinalized && (
-                                    <>
-                                      <button className="text-blue-500 hover:text-blue-700 text-sm font-bold px-1 shrink-0" onClick={() => { setEditingMaterialId(mat.id); setEditingMaterialName(mat.name); setEditingMaterialUnit(mat.unit); }}>✏️</button>
-                                      <button className="text-red-500 hover:text-red-700 text-sm font-bold px-1 shrink-0" onClick={() => handleDeleteMaterial(mat.id)}>✕</button>
-                                    </>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {autoSaving && <p className="text-xs text-gray-400 italic mt-2">⏳ Se salvează automat...</p>}
-
-                      {/* Butoane Salvează / Deblochează / Print / PDF — separate pe rol */}
-                      {activeMaterials.length > 0 && (
-                        <div className="mt-4 flex flex-wrap gap-2 items-center">
-                          {!materialsSaved && !projectFinalized && (
-                            <button className="bg-blue-600 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-blue-700 transition" onClick={() => handleSaveMaterials(activeMaterialRole)}>
-                              💾 Salvează materiale {activeMaterialRole === "montator" ? "Montator" : "Electrician"}
-                            </button>
-                          )}
-                          {materialsSaved && (
-                            <span className="text-sm text-green-700 font-semibold">
-                              ✅ Materiale {activeMaterialRole === "montator" ? "Montator" : "Electrician"} salvate
-                            </span>
-                          )}
-                          {materialsSaved && isAdmin && !projectFinalized && (
-                            <button className="bg-orange-500 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-orange-600 transition" onClick={() => handleUnlockMaterials(activeMaterialRole)}>
-                              🔓 Deblochează pentru modificare
-                            </button>
-                          )}
-                          {isAdmin && (
+                  return (
+                    <>
+                      {/* DATE CLIENT */}
+                      {sectionHeader("📋", "Date Client", showClient, () => setShowClient(!showClient))}
+                      {showClient && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 px-1">
+                          {isAdmin && !projectFinalized ? (
                             <>
-                              <button className="bg-gray-700 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-gray-800 transition" onClick={() => handlePrintMaterials(activeMaterialRole)}>🖨️ Printează</button>
-                              <button className="bg-green-700 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-green-800 transition" onClick={() => handleDownloadPDF(activeMaterialRole)}>⬇️ Descarcă PDF</button>
-                              <div className="w-full sm:w-px sm:h-6 h-px bg-gray-300 my-1 sm:my-0" />
-                              <button className="bg-gray-900 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-black transition" onClick={handlePrintTotal}>🖨️ Printează Total</button>
-                              <button className="bg-green-900 text-white font-semibold px-4 py-2 rounded text-sm hover:bg-green-950 transition" onClick={handleDownloadPDFTotal}>⬇️ Descarcă PDF Total</button>
+                              <input className={inputClass} placeholder="Client" value={form.client} onChange={(e) => setForm({ ...form, client: e.target.value })} />
+                              <input className={inputClass} placeholder="Telefon" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                              <input className={inputClass} placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                              <input className={inputClass} placeholder="Locație" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
+                            </>
+                          ) : (
+                            <>
+                              {fieldDisplay("Client", form.client)}
+                              {fieldDisplay("Telefon", form.phone)}
+                              {fieldDisplay("Email", form.email)}
+                              {fieldDisplay("Locație", form.location)}
                             </>
                           )}
                         </div>
                       )}
-                    </div>
-                  )}
-                </>
-              )}
 
-              {/* Butoane jos */}
-              <div className="flex flex-wrap gap-2 mt-6">
-                <button className="bg-gray-300 text-gray-800 font-semibold px-4 py-3 rounded text-base" onClick={resetForm}>Închide</button>
-                {isAdmin && !selectedProject && <button className="bg-blue-600 text-white font-semibold px-4 py-3 rounded text-base" onClick={handleSave}>Salvează</button>}
-                {isAdmin && selectedProject && !projectFinalized && (
+                      {/* DATE TEHNICE */}
+                      {sectionHeader("⚡", "Date Tehnice", showTechnical, () => setShowTechnical(!showTechnical))}
+                      {showTechnical && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 px-1">
+                          {isAdmin && !projectFinalized ? (
+                            <>
+                              <input className={inputClass} placeholder="Titlu proiect" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+                              <input className={inputClass} placeholder="kW" value={form.kw} onChange={(e) => setForm({ ...form, kw: e.target.value })} />
+                              <input className={inputClass} placeholder="Panouri" value={form.panels} onChange={(e) => setForm({ ...form, panels: e.target.value })} />
+                              <input className={inputClass} placeholder="Invertor" value={form.inverter} onChange={(e) => setForm({ ...form, inverter: e.target.value })} />
+                              <input className={inputClass} placeholder="Baterie" value={form.battery} onChange={(e) => setForm({ ...form, battery: e.target.value })} />
+                              <select className={selectClass} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                                <option>Programat</option>
+                                <option>În lucru</option>
+                                <option>Finalizat</option>
+                              </select>
+                              <textarea
+                                className={`${inputClass} col-span-1 sm:col-span-2 resize-none`}
+                                placeholder="Observații"
+                                rows={4}
+                                value={form.notes}
+                                onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                              />
+                            </>
+                          ) : (
+                            <>
+                              {fieldDisplay("Titlu proiect", form.title)}
+                              {fieldDisplay("kW", form.kw)}
+                              {fieldDisplay("Panouri", form.panels)}
+                              {fieldDisplay("Invertor", form.inverter)}
+                              {fieldDisplay("Baterie", form.battery)}
+                              {fieldDisplay("Status", form.status)}
+                              <div className="col-span-1 sm:col-span-2 p-3 bg-[#0a1628] rounded-xl border border-[#1e3a5f]">
+                                <p className="text-[10px] font-bold text-blue-400/70 uppercase tracking-widest mb-1">Observații</p>
+                                <p className="font-semibold text-slate-200 text-sm whitespace-pre-wrap leading-relaxed">{form.notes || "—"}</p>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+
+                      {/* POZE ACOPERIS */}
+                      {sectionHeader("🏠", "Poze Acoperiș", showRoof, () => setShowRoof(!showRoof))}
+                      {showRoof && (
+                        <div className="px-1">
+                          {isAdmin && !projectFinalized && (
+                            <label className="inline-flex items-center gap-2 cursor-pointer bg-blue-500/10 border border-blue-500/30 text-blue-400 px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-500/20 transition mb-3">
+                              📁 Adaugă poze acoperiș
+                              <input type="file" accept="image/*" className="hidden" onChange={async (e) => { const file = e.target.files?.[0]; if (file) await uploadImage(file, "roof"); }} />
+                            </label>
+                          )}
+                          <div className="grid grid-cols-3 gap-2">
+                            {form.roof_images.map((img, i) => (
+                              <img key={img} src={img} alt="" onClick={() => { setLightboxImages(form.roof_images); setActiveIndex(i); setLightboxCanDelete(isAdmin && !projectFinalized); setLightboxCategoryId(null); setOpenLightbox(true); }}
+                                className="rounded-xl border border-[#1e3a5f] h-28 w-full object-cover cursor-pointer hover:border-blue-500/50 transition" />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* SIMULARE */}
+                      {sectionHeader("☀️", "Simulare Panouri", showSimulation, () => setShowSimulation(!showSimulation))}
+                      {showSimulation && (
+                        <div className="px-1">
+                          {isAdmin && !projectFinalized && (
+                            <label className="inline-flex items-center gap-2 cursor-pointer bg-blue-500/10 border border-blue-500/30 text-blue-400 px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-500/20 transition mb-3">
+                              📁 Adaugă simulare
+                              <input type="file" accept="image/*" className="hidden" onChange={async (e) => { const file = e.target.files?.[0]; if (file) await uploadImage(file, "simulation"); }} />
+                            </label>
+                          )}
+                          <div className="grid grid-cols-3 gap-2">
+                            {form.simulation_images.map((img, i) => (
+                              <img key={img} src={img} alt="" onClick={() => { setLightboxImages(form.simulation_images); setActiveIndex(i); setLightboxCanDelete(isAdmin && !projectFinalized); setLightboxCategoryId(null); setOpenLightbox(true); }}
+                                className="rounded-xl border border-[#1e3a5f] h-28 w-full object-cover cursor-pointer hover:border-blue-500/50 transition" />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+
+                {/* ── POZE MONTAJ ── */}
+                {selectedProject && (
                   <>
-                    <button className="bg-blue-600 text-white font-semibold px-4 py-3 rounded text-base" onClick={handleUpdate}>Actualizează</button>
-                    <button className="bg-red-600 text-white font-semibold px-4 py-3 rounded text-base" onClick={handleDelete}>Șterge</button>
+                    <button
+                      className="w-full text-left flex items-center justify-between px-4 py-3 rounded-xl bg-[#0a1628] border border-[#1e3a5f] hover:border-blue-500/50 hover:bg-[#0f2235] transition-all text-sm font-semibold text-slate-300"
+                      onClick={() => setShowMontaj(!showMontaj)}
+                    >
+                      <span className="flex items-center gap-2">📸 Poze Montaj</span>
+                      <span className="text-blue-500 text-xs">{showMontaj ? "▲" : "▼"}</span>
+                    </button>
+                    {showMontaj && (
+                      <div className="px-1 space-y-3">
+                        {isAdmin && !projectFinalized && (
+                          <div className="flex gap-2">
+                            <input
+                              className="bg-[#0d2137] border border-[#1e3a5f] focus:border-blue-500 p-2.5 rounded-xl text-sm text-slate-200 placeholder-slate-500 outline-none transition flex-1"
+                              placeholder="Nume categorie (ex: Poze panouri)"
+                              value={newCategoryName}
+                              onChange={(e) => setNewCategoryName(e.target.value)}
+                              onKeyDown={(e) => { if (e.key === "Enter") handleAddCategory(); }}
+                            />
+                            <button
+                              className="bg-green-500/20 border border-green-500/40 text-green-400 px-3 py-2 rounded-xl text-sm font-semibold hover:bg-green-500/30 transition whitespace-nowrap"
+                              onClick={handleAddCategory}
+                            >
+                              + Categorie
+                            </button>
+                          </div>
+                        )}
+                        {isAdmin && montajCategories.length > 1 && (
+                          <p className="text-xs text-slate-500 italic">💡 Trage categoriile pentru a le reordona, sau folosește săgețile ↑↓</p>
+                        )}
+                        {montajCategories.length === 0 ? (
+                          <p className="text-sm text-slate-500 italic">
+                            {isAdmin ? "Nu există categorii. Adaugă prima categorie mai sus." : "Nu există categorii de poze definite."}
+                          </p>
+                        ) : (
+                          <div className="space-y-2">
+                            {montajCategories.map((cat, catIndex) => {
+                              const catImages = montajImages.filter((img) => img.category_id === cat.id);
+                              const isCollapsed = collapsedCategories[cat.id] ?? false;
+                              const isEditingThis = editingCategoryId === cat.id;
+                              return (
+                                <div
+                                  key={cat.id}
+                                  className="border border-[#1e3a5f] rounded-xl overflow-hidden transition-all"
+                                  draggable={isAdmin && !projectFinalized}
+                                  onDragStart={() => handleDragStart(cat.id)}
+                                  onDragOver={(e) => { handleDragOver(e, cat.id); (e.currentTarget as HTMLElement).classList.add("drag-over"); }}
+                                  onDragLeave={(e) => (e.currentTarget as HTMLElement).classList.remove("drag-over")}
+                                  onDrop={(e) => { (e.currentTarget as HTMLElement).classList.remove("drag-over"); handleDrop(); }}
+                                >
+                                  <div className="flex items-center bg-[#0a1628] px-3 py-2.5 gap-2">
+                                    {isAdmin && !projectFinalized && (
+                                      <span className="text-slate-600 cursor-grab active:cursor-grabbing text-lg select-none shrink-0">⠿</span>
+                                    )}
+                                    {isAdmin && !projectFinalized && isEditingThis ? (
+                                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                                        <input
+                                          className="bg-[#0d2137] border border-blue-500 p-1.5 rounded-lg text-sm text-slate-200 flex-1 min-w-0 outline-none"
+                                          value={editingCategoryName}
+                                          onChange={(e) => setEditingCategoryName(e.target.value)}
+                                          onKeyDown={(e) => { if (e.key === "Enter") handleSaveEditCategory(cat.id); if (e.key === "Escape") setEditingCategoryId(null); }}
+                                          autoFocus
+                                        />
+                                        <button className="bg-blue-600 text-white px-2 py-1 rounded-lg text-xs font-semibold hover:bg-blue-500 whitespace-nowrap" onClick={() => handleSaveEditCategory(cat.id)}>✓</button>
+                                        <button className="bg-[#1e3a5f] text-slate-300 px-2 py-1 rounded-lg text-xs font-semibold hover:bg-[#2a4a6f]" onClick={() => setEditingCategoryId(null)}>✕</button>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        className="flex items-center gap-2 flex-1 text-left min-w-0"
+                                        onClick={() => setCollapsedCategories((prev) => ({ ...prev, [cat.id]: !prev[cat.id] }))}
+                                      >
+                                        <span className="font-semibold text-sm text-slate-200 truncate">{cat.name}</span>
+                                        <span className="text-xs text-slate-500 shrink-0">({catImages.length} poze)</span>
+                                        <span className="text-blue-500 text-xs ml-auto shrink-0">{isCollapsed ? "▼" : "▲"}</span>
+                                      </button>
+                                    )}
+                                    {isAdmin && !projectFinalized && !isEditingThis && (
+                                      <div className="flex items-center gap-1 shrink-0 ml-1">
+                                        <button className="text-slate-500 hover:text-slate-300 font-bold px-1 disabled:opacity-20" onClick={() => moveCategoryUp(catIndex)} disabled={catIndex === 0}>↑</button>
+                                        <button className="text-slate-500 hover:text-slate-300 font-bold px-1 disabled:opacity-20" onClick={() => moveCategoryDown(catIndex)} disabled={catIndex === montajCategories.length - 1}>↓</button>
+                                        <button className="text-blue-400 hover:text-blue-300 text-sm font-bold px-1" onClick={() => { setEditingCategoryId(cat.id); setEditingCategoryName(cat.name); }}>✏️</button>
+                                        <button className="text-red-400 hover:text-red-300 text-sm font-bold px-1" onClick={() => handleDeleteCategory(cat.id)}>✕</button>
+                                      </div>
+                                    )}
+                                  </div>
+                                  {!isCollapsed && (
+                                    <div className="p-3 bg-[#0d1b2a]">
+                                      {!montajSaved && !projectFinalized && (
+                                        <label className="inline-flex items-center gap-2 cursor-pointer bg-blue-500/10 border border-blue-500/30 text-blue-400 px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-500/20 transition mb-3">
+                                          {uploadingCategory === cat.id ? "⏳ Se încarcă..." : "📷 Adaugă poze"}
+                                          <input
+                                            type="file" accept="image/*" multiple className="hidden"
+                                            disabled={uploadingCategory !== null}
+                                            onChange={async (e) => {
+                                              const files = Array.from(e.target.files || []);
+                                              for (const file of files) await uploadMontajImage(file, cat.id);
+                                              e.target.value = "";
+                                            }}
+                                          />
+                                        </label>
+                                      )}
+                                      {catImages.length === 0 ? (
+                                        <p className="text-xs text-slate-500 italic">Nu există poze în această categorie.</p>
+                                      ) : (
+                                        <div className="grid grid-cols-3 gap-2">
+                                          {catImages.map((img, i) => (
+                                            <div key={img.id} className="relative group">
+                                              <img
+                                                src={img.url} alt=""
+                                                className="rounded-xl border border-[#1e3a5f] h-28 w-full object-cover cursor-pointer hover:border-blue-500/50 transition"
+                                                onClick={() => { setLightboxImages(catImages.map((ci) => ci.url)); setActiveIndex(i); setLightboxCanDelete(!montajSaved && !projectFinalized); setLightboxCategoryId(cat.id); setOpenLightbox(true); }}
+                                              />
+                                              {!montajSaved && !projectFinalized && (
+                                                <button
+                                                  className="absolute top-1 right-1 bg-red-500/80 text-white rounded-full w-6 h-6 text-xs font-bold opacity-0 group-hover:opacity-100 transition flex items-center justify-center backdrop-blur-sm"
+                                                  onClick={(e) => { e.stopPropagation(); deleteMontajImage(img.id); }}
+                                                >✕</button>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                        <div className="flex flex-wrap gap-2 items-center pt-1">
+                          {!montajSaved && !projectFinalized && (
+                            <button className="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-4 py-2 rounded-xl text-sm transition" onClick={handleSaveMontaj}>
+                              💾 Salvează poze montaj
+                            </button>
+                          )}
+                          {montajSaved && <span className="text-sm text-green-400 font-semibold">✅ Poze montaj salvate</span>}
+                          {montajSaved && isAdmin && !projectFinalized && (
+                            <button className="bg-orange-500/20 border border-orange-500/40 text-orange-400 font-semibold px-4 py-2 rounded-xl text-sm hover:bg-orange-500/30 transition" onClick={handleUnlockMontaj}>
+                              🔓 Deblochează pentru modificare
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
-                {isAdmin && selectedProject && projectFinalized && (
-                  <button className="bg-orange-500 text-white font-semibold px-4 py-3 rounded text-base hover:bg-orange-600 transition" onClick={handleUnlockProject}>
-                    🔓 Deblochează proiectul
+
+                {/* ── MATERIALE ── */}
+                {selectedProject && (
+                  <>
+                    <button
+                      className="w-full text-left flex items-center justify-between px-4 py-3 rounded-xl bg-[#0a1628] border border-[#1e3a5f] hover:border-blue-500/50 hover:bg-[#0f2235] transition-all text-sm font-semibold text-slate-300"
+                      onClick={() => setShowMaterials(!showMaterials)}
+                    >
+                      <span className="flex items-center gap-2">🔧 Materiale folosite</span>
+                      <span className="text-blue-500 text-xs">{showMaterials ? "▲" : "▼"}</span>
+                    </button>
+                    {showMaterials && (
+                      <div className="px-1 space-y-3">
+
+                        {/* Tab-uri Montator / Electrician */}
+                        <div className="flex border-b border-[#1e3a5f]">
+                          <button
+                            className={`px-5 py-2.5 text-sm font-semibold border-b-2 transition-colors ${activeMaterialRole === "montator" ? "border-blue-500 text-blue-400" : "border-transparent text-slate-500 hover:text-slate-300"}`}
+                            onClick={() => { setActiveMaterialRole("montator"); setEditingMaterialId(null); }}
+                          >
+                            🔩 Montator
+                          </button>
+                          <button
+                            className={`px-5 py-2.5 text-sm font-semibold border-b-2 transition-colors ${activeMaterialRole === "electrician" ? "border-yellow-500 text-yellow-400" : "border-transparent text-slate-500 hover:text-slate-300"}`}
+                            onClick={() => { setActiveMaterialRole("electrician"); setEditingMaterialId(null); }}
+                          >
+                            ⚡ Electrician
+                          </button>
+                        </div>
+
+                        {/* Adaugă material */}
+                        {isAdmin && !projectFinalized && (
+                          <div className="flex flex-wrap gap-2">
+                            <input
+                              className="bg-[#0d2137] border border-[#1e3a5f] focus:border-blue-500 p-2.5 rounded-xl text-sm text-slate-200 placeholder-slate-500 outline-none transition flex-1 min-w-[150px]"
+                              placeholder={`Nume material ${activeMaterialRole === "montator" ? "montator" : "electrician"}`}
+                              value={newMaterialName}
+                              onChange={(e) => setNewMaterialName(e.target.value)}
+                            />
+                            <input
+                              className="bg-[#0d2137] border border-[#1e3a5f] focus:border-blue-500 p-2.5 rounded-xl text-sm text-slate-200 outline-none transition w-20"
+                              placeholder="U.M."
+                              value={newMaterialUnit}
+                              onChange={(e) => setNewMaterialUnit(e.target.value)}
+                            />
+                            <button
+                              className="bg-green-500/20 border border-green-500/40 text-green-400 px-3 py-2 rounded-xl text-sm font-semibold hover:bg-green-500/30 transition"
+                              onClick={handleAddMaterial}
+                            >
+                              + Adaugă
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Lista materiale */}
+                        {activeMaterials.length === 0 ? (
+                          <p className="text-sm text-slate-500 italic">
+                            {isAdmin
+                              ? `Nu există materiale pentru ${activeMaterialRole === "montator" ? "Montator" : "Electrician"}.`
+                              : `Nu există materiale definite.`}
+                          </p>
+                        ) : (
+                          <div className="space-y-2">
+                            {activeMaterials.map((mat) => (
+                              <div key={mat.id} className="flex items-center gap-2 p-2.5 bg-[#0a1628] rounded-xl border border-[#1e3a5f]">
+                                {isAdmin && !projectFinalized && editingMaterialId === mat.id ? (
+                                  <>
+                                    <input className="bg-[#0d2137] border border-blue-500 p-1.5 rounded-lg text-sm text-slate-200 flex-1 min-w-0 outline-none" value={editingMaterialName} onChange={(e) => setEditingMaterialName(e.target.value)} autoFocus />
+                                    <input className="bg-[#0d2137] border border-blue-500 p-1.5 rounded-lg text-sm text-slate-200 w-16 outline-none" value={editingMaterialUnit} onChange={(e) => setEditingMaterialUnit(e.target.value)} />
+                                    <button className="bg-blue-600 text-white px-2 py-1 rounded-lg text-xs font-semibold hover:bg-blue-500 whitespace-nowrap" onClick={() => handleSaveEditMaterial(mat.id)}>✓</button>
+                                    <button className="bg-[#1e3a5f] text-slate-300 px-2 py-1 rounded-lg text-xs font-semibold hover:bg-[#2a4a6f]" onClick={() => setEditingMaterialId(null)}>✕</button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="flex-1 text-sm font-medium text-slate-200 min-w-0">
+                                      {mat.name}
+                                      <span className="text-slate-500 ml-1 text-xs">({mat.unit})</span>
+                                    </span>
+                                    <input
+                                      type="number" min="0"
+                                      className={`border p-2 rounded-xl text-sm text-center w-20 shrink-0 outline-none transition ${(materialsSaved && !isAdmin) || projectFinalized ? "bg-[#0a1628] border-[#1e3a5f] text-slate-500 cursor-not-allowed" : "bg-[#0d2137] border-[#1e3a5f] text-slate-200 focus:border-blue-500"}`}
+                                      placeholder="0"
+                                      value={quantities[mat.id] || ""}
+                                      disabled={(materialsSaved && !isAdmin) || projectFinalized}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setQuantities((prev) => ({ ...prev, [mat.id]: val }));
+                                        if (debounceRef.current) clearTimeout(debounceRef.current);
+                                        debounceRef.current = setTimeout(() => autoSaveQuantity(mat.id, val, projectMaterials), 1000);
+                                      }}
+                                    />
+                                    <span className="text-xs text-slate-500 w-8 shrink-0">{mat.unit}</span>
+                                    {isAdmin && !projectFinalized && (
+                                      <>
+                                        <button className="text-blue-400 hover:text-blue-300 text-sm px-1 shrink-0" onClick={() => { setEditingMaterialId(mat.id); setEditingMaterialName(mat.name); setEditingMaterialUnit(mat.unit); }}>✏️</button>
+                                        <button className="text-red-400 hover:text-red-300 text-sm px-1 shrink-0" onClick={() => handleDeleteMaterial(mat.id)}>✕</button>
+                                      </>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {autoSaving && <p className="text-xs text-slate-500 italic">⏳ Se salvează automat...</p>}
+
+                        {/* Butoane salvare / print / PDF */}
+                        {activeMaterials.length > 0 && (
+                          <div className="flex flex-wrap gap-2 items-center pt-1">
+                            {!materialsSaved && !projectFinalized && (
+                              <button
+                                className="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-4 py-2 rounded-xl text-sm transition"
+                                onClick={() => handleSaveMaterials(activeMaterialRole)}
+                              >
+                                💾 Salvează {activeMaterialRole === "montator" ? "Montator" : "Electrician"}
+                              </button>
+                            )}
+                            {materialsSaved && (
+                              <span className="text-sm text-green-400 font-semibold">
+                                ✅ {activeMaterialRole === "montator" ? "Montator" : "Electrician"} salvat
+                              </span>
+                            )}
+                            {materialsSaved && isAdmin && !projectFinalized && (
+                              <button
+                                className="bg-orange-500/20 border border-orange-500/40 text-orange-400 font-semibold px-4 py-2 rounded-xl text-sm hover:bg-orange-500/30 transition"
+                                onClick={() => handleUnlockMaterials(activeMaterialRole)}
+                              >
+                                🔓 Deblochează
+                              </button>
+                            )}
+                            {isAdmin && (
+                              <>
+                                <button className="bg-[#1e3a5f] hover:bg-[#2a4a6f] text-slate-300 font-semibold px-4 py-2 rounded-xl text-sm transition" onClick={() => handlePrintMaterials(activeMaterialRole)}>🖨️ Printează</button>
+                                <button className="bg-green-600/20 border border-green-600/40 text-green-400 font-semibold px-4 py-2 rounded-xl text-sm hover:bg-green-600/30 transition" onClick={() => handleDownloadPDF(activeMaterialRole)}>⬇️ PDF</button>
+                                <div className="w-px h-6 bg-[#1e3a5f] mx-1 hidden sm:block" />
+                                <button className="bg-[#1e3a5f] hover:bg-[#2a4a6f] text-slate-300 font-semibold px-4 py-2 rounded-xl text-sm transition" onClick={handlePrintTotal}>🖨️ Print Total</button>
+                                <button className="bg-green-600/20 border border-green-600/40 text-green-400 font-semibold px-4 py-2 rounded-xl text-sm hover:bg-green-600/30 transition" onClick={handleDownloadPDFTotal}>⬇️ PDF Total</button>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* ── Footer butoane ── */}
+                <div className="flex flex-wrap gap-2 pt-4 border-t border-[#1e3a5f]">
+                  <button
+                    className="bg-[#1e3a5f] hover:bg-[#2a4a6f] text-slate-300 font-semibold px-5 py-2.5 rounded-xl text-sm transition"
+                    onClick={resetForm}
+                  >
+                    Închide
+                  </button>
+                  {isAdmin && !selectedProject && (
+                    <button className="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition" onClick={handleSave}>
+                      Salvează
+                    </button>
+                  )}
+                  {isAdmin && selectedProject && !projectFinalized && (
+                    <>
+                      <button className="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition" onClick={handleUpdate}>
+                        Actualizează
+                      </button>
+                      <button className="bg-red-500/20 border border-red-500/40 text-red-400 font-semibold px-5 py-2.5 rounded-xl text-sm hover:bg-red-500/30 transition" onClick={handleDelete}>
+                        Șterge
+                      </button>
+                    </>
+                  )}
+                  {isAdmin && selectedProject && projectFinalized && (
+                    <button
+                      className="bg-orange-500/20 border border-orange-500/40 text-orange-400 font-semibold px-5 py-2.5 rounded-xl text-sm hover:bg-orange-500/30 transition"
+                      onClick={handleUnlockProject}
+                    >
+                      🔓 Deblochează proiectul
+                    </button>
+                  )}
+                </div>
+
+                {/* ── Buton Finalizare ── */}
+                {selectedProject && !projectFinalized && (
+                  <button
+                    className="w-full bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white font-bold py-3 rounded-xl text-sm transition shadow-lg shadow-green-900/30"
+                    onClick={handleFinalizeProject}
+                  >
+                    ✅ Finalizare proiect
                   </button>
                 )}
+                {selectedProject && projectFinalized && (
+                  <div className="w-full bg-green-500/10 border border-green-500/30 text-green-400 font-semibold py-3 rounded-xl text-sm text-center">
+                    ✅ Proiect finalizat
+                  </div>
+                )}
+
               </div>
-
-              {/* Buton Finalizare */}
-              {selectedProject && !projectFinalized && (
-                <button className="w-full mt-3 bg-green-600 text-white font-bold py-3 rounded-lg text-base hover:bg-green-700 transition" onClick={handleFinalizeProject}>
-                  ✅ Finalizare proiect
-                </button>
-              )}
-              {selectedProject && projectFinalized && (
-                <div className="w-full mt-3 bg-green-50 border border-green-300 text-green-800 font-semibold py-3 rounded-lg text-base text-center">
-                  ✅ Proiect finalizat
-                </div>
-              )}
-
             </div>
           </div>
         )}
