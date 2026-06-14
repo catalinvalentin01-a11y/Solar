@@ -280,7 +280,6 @@ function ProjectsPageInner() {
     setCollapsedCategories({});
     setProjectHistory([]);
     setShowHistory(false);
-    // Curăță ?open=ID din URL ca notificarea să poată redeschide același proiect
     router.replace("/projects");
   };
 
@@ -288,7 +287,6 @@ function ProjectsPageInner() {
     const { error } = await supabase.from("projects").insert({ ...form, date: selectedDate }).select();
     if (error) { alert(error.message); return; }
 
-    // Adaugă automat clientul dacă nu există deja (verifică după telefon)
     if (form.client.trim()) {
       const { data: existing } = await supabase
         .from("clients")
@@ -343,20 +341,30 @@ function ProjectsPageInner() {
       `Ești sigur că vrei să finalizezi proiectul "${form.client} - ${form.title}"?\n\nDupă finalizare, toate modificările vor fi blocate.`
     );
     if (!confirmed) return;
+
     const { error } = await supabase.from("projects").update({ status: "Finalizat" }).eq("id", selectedProject.id);
     if (error) { alert("Eroare: " + error.message); return; }
+
     await supabase.from("notifications").insert({
       title: "✅ Proiect finalizat",
       message: `Proiectul "${form.client} - ${form.title}" (${selectedDate || "fără dată"}) a fost marcat ca finalizat.`,
       project_id: selectedProject.id,
     });
+
     await logHistory(selectedProject.id, "✅ Finalizare proiect");
-    // Actualizează status_montaj în clients
-    if (form.phone) {
+
+    // ✅ FIX: citim phone direct din DB, nu din form.phone (care poate fi gol la non-admin)
+    const { data: projectData } = await supabase
+      .from("projects")
+      .select("phone")
+      .eq("id", selectedProject.id)
+      .single();
+
+    if (projectData?.phone) {
       await supabase
         .from("clients")
         .update({ status_montaj: "Efectuat" })
-        .eq("phone", form.phone);
+        .eq("phone", projectData.phone);
     }
 
     setProjectFinalized(true);
@@ -372,12 +380,18 @@ function ProjectsPageInner() {
     await logHistory(selectedProject.id, "🔓 Deblocare proiect");
     await loadHistory(selectedProject.id);
 
-    // Resetează status_montaj în clients
-    if (form.phone) {
+    // ✅ FIX: citim phone direct din DB
+    const { data: projectData } = await supabase
+      .from("projects")
+      .select("phone")
+      .eq("id", selectedProject.id)
+      .single();
+
+    if (projectData?.phone) {
       await supabase
         .from("clients")
         .update({ status_montaj: "În așteptare" })
-        .eq("phone", form.phone);
+        .eq("phone", projectData.phone);
     }
 
     setProjectFinalized(false);
@@ -1257,7 +1271,6 @@ function ProjectsPageInner() {
                                         className="flex items-center gap-2 flex-1 text-left min-w-0"
                                         onClick={() => setCollapsedCategories((prev) => ({ ...prev, [cat.id]: !prev[cat.id] }))}
                                       >
-                                        {/* ✅ FIX: înlocuit truncate cu break-words */}
                                         <span className="font-semibold text-sm text-slate-200 break-words min-w-0">{cat.name}</span>
                                         <span className="text-xs text-slate-500 shrink-0">({catImages.length} poze)</span>
                                         <span className="text-blue-500 text-xs ml-auto shrink-0">{isCollapsed ? "▼" : "▲"}</span>
