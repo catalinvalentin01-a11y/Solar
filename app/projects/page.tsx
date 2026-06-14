@@ -336,20 +336,13 @@ function ProjectsPageInner() {
   };
 
   // ✅ FIX: actualizare client prin API route (service role, ocolește RLS)
+  // Trimitem phone direct la API - căutarea se face server-side cu service role
   const updateClientStatus = async (phone: string, status_montaj: string) => {
-    const { data: clientData } = await supabase
-      .from("clients")
-      .select("id")
-      .eq("phone", phone)
-      .maybeSingle();
-
-    if (clientData?.id) {
-      await fetch("/api/clients", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: clientData.id, status_montaj }),
-      });
-    }
+    await fetch("/api/clients", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone, status_montaj }),
+    });
   };
 
   const handleFinalizeProject = async () => {

@@ -37,6 +37,22 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   const body = await req.json();
 
+  // ✅ FIX: dacă vine phone în loc de id, căutăm clientul după telefon
+  let clientId = body.id;
+
+  if (!clientId && body.phone) {
+    const { data: found } = await supabase
+      .from("clients")
+      .select("id")
+      .eq("phone", body.phone)
+      .maybeSingle();
+    clientId = found?.id;
+  }
+
+  if (!clientId) {
+    return Response.json({ error: "Client negăsit" }, { status: 404 });
+  }
+
   const updateData: Record<string, any> = {};
   if (body.name !== undefined) updateData.name = body.name;
   if (body.email !== undefined) updateData.email = body.email;
@@ -51,7 +67,7 @@ export async function PUT(req: Request) {
   const { data, error } = await supabase
     .from("clients")
     .update(updateData)
-    .eq("id", body.id)
+    .eq("id", clientId)
     .select()
     .single();
 
