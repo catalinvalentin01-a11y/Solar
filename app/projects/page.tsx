@@ -335,6 +335,23 @@ function ProjectsPageInner() {
     resetForm();
   };
 
+  // ✅ FIX: actualizare client prin API route (service role, ocolește RLS)
+  const updateClientStatus = async (phone: string, status_montaj: string) => {
+    const { data: clientData } = await supabase
+      .from("clients")
+      .select("id")
+      .eq("phone", phone)
+      .maybeSingle();
+
+    if (clientData?.id) {
+      await fetch("/api/clients", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: clientData.id, status_montaj }),
+      });
+    }
+  };
+
   const handleFinalizeProject = async () => {
     if (!selectedProject?.id) return;
     const confirmed = confirm(
@@ -353,7 +370,6 @@ function ProjectsPageInner() {
 
     await logHistory(selectedProject.id, "✅ Finalizare proiect");
 
-    // ✅ FIX: citim phone direct din DB, nu din form.phone (care poate fi gol la non-admin)
     const { data: projectData } = await supabase
       .from("projects")
       .select("phone")
@@ -361,10 +377,7 @@ function ProjectsPageInner() {
       .single();
 
     if (projectData?.phone) {
-      await supabase
-        .from("clients")
-        .update({ status_montaj: "Efectuat" })
-        .eq("phone", projectData.phone);
+      await updateClientStatus(projectData.phone, "Efectuat");
     }
 
     setProjectFinalized(true);
@@ -375,12 +388,13 @@ function ProjectsPageInner() {
   const handleUnlockProject = async () => {
     if (!selectedProject?.id) return;
     if (!confirm("Deblochezi proiectul pentru modificare?")) return;
+
     const { error } = await supabase.from("projects").update({ status: "În lucru" }).eq("id", selectedProject.id);
     if (error) { alert("Eroare: " + error.message); return; }
+
     await logHistory(selectedProject.id, "🔓 Deblocare proiect");
     await loadHistory(selectedProject.id);
 
-    // ✅ FIX: citim phone direct din DB
     const { data: projectData } = await supabase
       .from("projects")
       .select("phone")
@@ -388,10 +402,7 @@ function ProjectsPageInner() {
       .single();
 
     if (projectData?.phone) {
-      await supabase
-        .from("clients")
-        .update({ status_montaj: "În așteptare" })
-        .eq("phone", projectData.phone);
+      await updateClientStatus(projectData.phone, "În așteptare");
     }
 
     setProjectFinalized(false);

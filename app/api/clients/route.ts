@@ -37,19 +37,20 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   const body = await req.json();
 
+  const updateData: Record<string, any> = {};
+  if (body.name !== undefined) updateData.name = body.name;
+  if (body.email !== undefined) updateData.email = body.email;
+  if (body.phone !== undefined) updateData.phone = body.phone;
+  if (body.address !== undefined) updateData.address = body.address;
+  if (body.codMontaj !== undefined) updateData.cod_montaj = body.codMontaj;
+  if (body.dataMontaj !== undefined) updateData.data_montaj = body.dataMontaj;
+  if (body.status_montaj !== undefined) updateData.status_montaj = body.status_montaj;
+  if (body.observatii !== undefined) updateData.observatii = body.observatii;
+  if (body.status !== undefined) updateData.status = body.status;
+
   const { data, error } = await supabase
     .from("clients")
-    .update({
-      name: body.name,
-      email: body.email || null,
-      phone: body.phone || null,
-      address: body.address || null,
-      cod_montaj: body.codMontaj || null,
-      data_montaj: body.dataMontaj || null,
-      status_montaj: body.statusMontaj || "În așteptare",
-      observatii: body.observatii || null,
-      status: body.status || "Lead",
-    })
+    .update(updateData)
     .eq("id", body.id)
     .select()
     .single();
