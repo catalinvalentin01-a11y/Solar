@@ -124,6 +124,9 @@ function ProjectsPageInner() {
   const dragCatRef = useRef<string | null>(null);
   const dragOverCatRef = useRef<string | null>(null);
 
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchStatus, setSearchStatus] = useState("");
+
   const [form, setForm] = useState<Project>({
     client: "", phone: "", email: "", title: "", location: "",
     kw: "", battery: "", panels: "", inverter: "", notes: "",
@@ -134,6 +137,20 @@ function ProjectsPageInner() {
   const materialsElectrician = materials.filter((m) => m.role === "electrician");
   const activeMaterials = activeMaterialRole === "montator" ? materialsMontator : materialsElectrician;
   const materialsSaved = activeMaterialRole === "montator" ? materialsSavedMontator : materialsSavedElectrician;
+
+  const allProjects: Project[] = events.map((e) => ({ ...e.extendedProps, id: e.id }));
+  const searchResults = (searchQuery || searchStatus)
+    ? allProjects.filter((p) => {
+        const q = searchQuery.toLowerCase();
+        const matchesQuery = !q || (
+          (p.client || "").toLowerCase().includes(q) ||
+          (p.title || "").toLowerCase().includes(q) ||
+          (p.location || "").toLowerCase().includes(q)
+        );
+        const matchesStatus = !searchStatus || p.status === searchStatus;
+        return matchesQuery && matchesStatus;
+      })
+    : [];
 
   useEffect(() => {
     const check = async () => {
@@ -781,6 +798,83 @@ function ProjectsPageInner() {
             -webkit-text-fill-color: #e2e8f0 !important;
           }
         `}</style>
+
+        {/* ── Search bar ── */}
+        <div className="flex gap-2 mb-4">
+          <div className="relative flex-1">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔍</span>
+            <input
+              className="w-full bg-[#0d1b2a] border border-[#1e3a5f] focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 pl-9 pr-8 py-2.5 rounded-xl text-sm text-slate-200 placeholder-slate-500 outline-none transition"
+              placeholder="Caută după client, locație, titlu..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition"
+                onClick={() => setSearchQuery("")}
+              >✕</button>
+            )}
+          </div>
+          <select
+            className="bg-[#0d1b2a] border border-[#1e3a5f] focus:border-blue-500 text-slate-200 text-sm rounded-xl px-3 py-2.5 outline-none transition shrink-0"
+            value={searchStatus}
+            onChange={(e) => setSearchStatus(e.target.value)}
+          >
+            <option value="">Toate</option>
+            <option value="Programat">Programat</option>
+            <option value="În lucru">În lucru</option>
+            <option value="Finalizat">Finalizat</option>
+          </select>
+        </div>
+
+        {/* ── Search results ── */}
+        {(searchQuery || searchStatus) && (
+          <div className="mb-4 flex flex-col gap-2">
+            {searchResults.length === 0 ? (
+              <p className="text-slate-500 text-sm italic px-1">Niciun proiect găsit.</p>
+            ) : (
+              <>
+                <p className="text-xs text-slate-500 px-1">{searchResults.length} proiect{searchResults.length !== 1 ? "e" : ""} găsit{searchResults.length !== 1 ? "e" : ""}</p>
+                {searchResults.map((p) => (
+                  <button
+                    key={p.id}
+                    className="flex items-center justify-between bg-[#0d1b2a] border border-[#1e3a5f] hover:border-blue-500/50 hover:bg-[#0f2235] rounded-xl px-4 py-3 transition text-left w-full"
+                    onClick={() => {
+                      setSelectedProject(p);
+                      setSelectedDate(p.date || null);
+                      setForm({
+                        client: p.client || "", phone: p.phone || "", email: p.email || "",
+                        title: p.title || "", location: p.location || "", kw: p.kw || "",
+                        battery: p.battery || "", panels: p.panels || "", inverter: p.inverter || "",
+                        notes: p.notes || "", status: p.status || "Programat",
+                        roof_images: p.roof_images || [], simulation_images: p.simulation_images || [],
+                      });
+                      setProjectFinalized(p.status === "Finalizat");
+                      setShowClient(false); setShowTechnical(false); setShowRoof(false);
+                      setShowSimulation(false); setShowMaterials(false); setShowMontaj(false);
+                      setActiveMaterialRole("montator");
+                      loadProjectMaterials(p.id!);
+                      loadMontajImages(p.id!);
+                      setOpen(true);
+                    }}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-slate-200 text-sm">{p.client}{p.title ? ` — ${p.title}` : ""}</p>
+                      <div className="flex flex-wrap gap-x-3 mt-0.5">
+                        {p.location && <p className="text-xs text-slate-500">📍 {p.location}</p>}
+                        {p.date && <p className="text-xs text-slate-500">📅 {p.date}</p>}
+                      </div>
+                    </div>
+                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 ml-3 ${statusBadge(p.status)}`}>
+                      {p.status}
+                    </span>
+                  </button>
+                ))}
+              </>
+            )}
+          </div>
+        )}
 
         <div className="overflow-x-auto rounded-xl border border-[#1e2a3a] shadow-2xl">
           <FullCalendar
