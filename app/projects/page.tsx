@@ -35,6 +35,8 @@ type Material = {
   name: string;
   unit: string;
   role: string;
+  quantity?: number;
+  min_quantity?: number;
 };
 
 type ProjectMaterial = {
@@ -335,8 +337,6 @@ function ProjectsPageInner() {
     resetForm();
   };
 
-  // ✅ FIX: actualizare client prin API route (service role, ocolește RLS)
-  // Trimitem phone direct la API - căutarea se face server-side cu service role
   const updateClientStatus = async (phone: string, status_montaj: string) => {
     await fetch("/api/clients", {
       method: "PUT",
@@ -464,41 +464,154 @@ function ProjectsPageInner() {
     [selectedProject]
   );
 
+  // ── LOGICA DE STOC ──────────────────────────────────────────────────────────
+  //
+  // La salvare: calculăm diferența față de ce era salvat anterior și scădem
+  // doar diferența din stoc. Exemplu:
+  //   - Prima dată salvăm 5 → stoc scade cu 5
+  //   - Deblocăm și schimbăm în 7 → stoc scade cu 2 (diferența)
+  //   - Deblocăm și schimbăm în 3 → stocul se reface cu 2 (diferența negativă)
+  //
+  // La deblocare: refacem stocul cu cantitățile care erau salvate (le readăugăm).
+  // ─────────────────────────────────────────────────────────────────────────────
+
   const handleSaveMaterials = async (role: MaterialRole) => {
     if (!selectedProject?.id) return;
     const roleMaterials = materials.filter((m) => m.role === role);
+
+    // Calculăm diferențele față de valorile anterior salvate
+    const stockUpdates: { material_id: string; delta: number }[] = [];
+
+    for (const mat of roleMaterials) {
+      const newQty = parseFloat(quantities[mat.id] || "0") || 0;
+      const existing = projectMaterials.find((pm) => pm.material_id === mat.id);
+      // Cantitatea anterioară salvată (dacă există și era marcată ca saved)
+      const prevQty = existing?.saved ? parseFloat(existing.quantity || "0") || 0 : 0;
+      const delta = newQty - prevQty;
+      if (delta !== 0) {
+        stockUpdates.push({ material_id: mat.id, delta });
+      }
+    }
+
+    // Salvăm materialele proiectului
     const upsertData = roleMaterials.map((m) => ({
-      project_id: selectedProject.id!, material_id: m.id,
-      quantity: quantities[m.id] || "", saved: true, saved_at: new Date().toISOString(),
+      project_id: selectedProject.id!,
+      material_id: m.id,
+      quantity: quantities[m.id] || "",
+      saved: true,
+      saved_at: new Date().toISOString(),
     }));
-    const { error } = await supabase.from("project_materials").upsert(upsertData, { onConflict: "project_id,material_id" });
+
+    const { error } = await supabase
+      .from("project_materials")
+      .upsert(upsertData, { onConflict: "project_id,material_id" });
+
     if (error) { alert("Eroare la salvare: " + error.message); return; }
+
+    // Actualizăm stocul pentru fiecare material cu diferența calculată
+    for (const { material_id, delta } of stockUpdates) {
+      // Fetch cantitate curentă din stoc
+      const { data: stockRow } = await supabase
+        .from("materials")
+        .select("quantity")
+        .eq("id", material_id)
+        .single();
+
+      if (stockRow) {
+        const currentStock = parseFloat(stockRow.quantity) || 0;
+        const newStock = Math.max(0, currentStock - delta); // nu lăsăm stocul negativ
+        await supabase
+          .from("materials")
+          .update({ quantity: newStock })
+          .eq("id", material_id);
+
+        // Înregistrăm mișcarea în stock_movements
+        await supabase.from("stock_movements").insert({
+          material_id,
+          project_id: selectedProject.id,
+          quantity_change: -delta, // negativ = ieșire din stoc
+          type: "consum_proiect",
+          note: `Proiect: ${form.client} - ${form.title}`,
+        });
+      }
+    }
+
     if (role === "montator") setMaterialsSavedMontator(true);
     else setMaterialsSavedElectrician(true);
-    await logHistory(selectedProject.id!, `💾 Materiale salvate (${role === "montator" ? "Montator" : "Electrician"})`);
+
+    await logHistory(
+      selectedProject.id!,
+      `💾 Materiale salvate (${role === "montator" ? "Montator" : "Electrician"})`
+    );
     if (isSuperAdmin) await loadHistory(selectedProject.id!);
-    setProjectMaterials((prev) => prev.map((pm) => {
-      const belongs = roleMaterials.some((m) => m.id === pm.material_id);
-      return belongs ? { ...pm, saved: true } : pm;
-    }));
+
+    setProjectMaterials((prev) =>
+      prev.map((pm) => {
+        const belongs = roleMaterials.some((m) => m.id === pm.material_id);
+        return belongs ? { ...pm, saved: true } : pm;
+      })
+    );
+
+    // Reîncărcăm materialele pentru a reflecta stocurile actualizate
+    await loadMaterials();
   };
 
   const handleUnlockMaterials = async (role: MaterialRole) => {
     if (!selectedProject?.id) return;
     const roleMaterialIds = materials.filter((m) => m.role === role).map((m) => m.id);
+
+    // Readăugăm în stoc cantitățile care fuseseră scăzute la salvare
     for (const mid of roleMaterialIds) {
       const row = projectMaterials.find((pm) => pm.material_id === mid);
-      if (row?.id) {
-        await supabase.from("project_materials").update({ saved: false, saved_at: null }).eq("id", row.id);
+      if (row?.id && row.saved) {
+        const restoredQty = parseFloat(row.quantity || "0") || 0;
+        if (restoredQty > 0) {
+          const { data: stockRow } = await supabase
+            .from("materials")
+            .select("quantity")
+            .eq("id", mid)
+            .single();
+
+          if (stockRow) {
+            const currentStock = parseFloat(stockRow.quantity) || 0;
+            await supabase
+              .from("materials")
+              .update({ quantity: currentStock + restoredQty })
+              .eq("id", mid);
+
+            // Înregistrăm mișcarea ca revenire în stoc
+            await supabase.from("stock_movements").insert({
+              material_id: mid,
+              project_id: selectedProject.id,
+              quantity_change: restoredQty, // pozitiv = intrare în stoc
+              type: "ajustare",
+              note: `Deblocare materiale proiect: ${form.client} - ${form.title}`,
+            });
+          }
+        }
+
+        await supabase
+          .from("project_materials")
+          .update({ saved: false, saved_at: null })
+          .eq("id", row.id);
       }
     }
+
     if (role === "montator") setMaterialsSavedMontator(false);
     else setMaterialsSavedElectrician(false);
-    setProjectMaterials((prev) => prev.map((pm) => {
-      const belongs = roleMaterialIds.includes(pm.material_id);
-      return belongs ? { ...pm, saved: false } : pm;
-    }));
+
+    setProjectMaterials((prev) =>
+      prev.map((pm) => {
+        const belongs = roleMaterialIds.includes(pm.material_id);
+        return belongs ? { ...pm, saved: false } : pm;
+      })
+    );
+
+    // Reîncărcăm materialele pentru stocuri actualizate
+    await loadMaterials();
   };
+
+  // ─────────────────────────────────────────────────────────────────────────────
 
   const handlePrintMaterials = (role: MaterialRole) => {
     const roleMaterials = materials.filter((m) => m.role === role);
@@ -1423,6 +1536,16 @@ function ProjectsPageInner() {
                                       {mat.name}
                                       <span className="text-slate-500 ml-1 text-xs">({mat.unit})</span>
                                     </span>
+                                    {/* Afișăm stocul disponibil dacă suntem admin */}
+                                    {isAdmin && mat.quantity !== undefined && (
+                                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${
+                                        mat.quantity <= (mat.min_quantity ?? 0)
+                                          ? "bg-red-500/20 text-red-400 border border-red-500/30"
+                                          : "bg-slate-700/50 text-slate-400"
+                                      }`}>
+                                        Stoc: {mat.quantity} {mat.unit}
+                                      </span>
+                                    )}
                                     <input
                                       type="number" min="0"
                                       className={`border p-2 rounded-xl text-sm text-center w-20 shrink-0 outline-none transition ${(materialsSaved && !isAdmin) || projectFinalized ? "bg-[#0a1628] border-[#1e3a5f] text-slate-500 cursor-not-allowed" : "bg-[#0d2137] border-[#1e3a5f] text-slate-200 focus:border-blue-500"}`}
@@ -1560,35 +1683,36 @@ function ProjectsPageInner() {
                   )}
                 </div>
 
-               {selectedProject && !projectFinalized && (() => {
-  const canFinalize = materialsSavedMontator && materialsSavedElectrician && montajSaved;
-  const missingItems = [
-    !materialsSavedMontator && "materiale montator",
-    !materialsSavedElectrician && "materiale electrician",
-    !montajSaved && "poze montaj",
-  ].filter(Boolean).join(", ");
+                {selectedProject && !projectFinalized && (() => {
+                  const canFinalize = materialsSavedMontator && materialsSavedElectrician && montajSaved;
+                  const missingItems = [
+                    !materialsSavedMontator && "materiale montator",
+                    !materialsSavedElectrician && "materiale electrician",
+                    !montajSaved && "poze montaj",
+                  ].filter(Boolean).join(", ");
 
-  return (
-    <div className="flex flex-col gap-2">
-      <button
-        className={`w-full font-bold py-3 rounded-xl text-sm transition shadow-lg ${
-          canFinalize
-            ? "bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white shadow-green-900/30"
-            : "bg-slate-700/50 border border-slate-600/50 text-slate-500 cursor-not-allowed shadow-none"
-        }`}
-        onClick={canFinalize ? handleFinalizeProject : undefined}
-        disabled={!canFinalize}
-      >
-        ✅ Finalizare proiect
-      </button>
-      {!canFinalize && (
-        <p className="text-xs text-yellow-500/80 text-center">
-          ⚠️ Salvează înainte de finalizare: {missingItems}
-        </p>
-      )}
-    </div>
-  );
-})()}
+                  return (
+                    <div className="flex flex-col gap-2">
+                      <button
+                        className={`w-full font-bold py-3 rounded-xl text-sm transition shadow-lg ${
+                          canFinalize
+                            ? "bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white shadow-green-900/30"
+                            : "bg-slate-700/50 border border-slate-600/50 text-slate-500 cursor-not-allowed shadow-none"
+                        }`}
+                        onClick={canFinalize ? handleFinalizeProject : undefined}
+                        disabled={!canFinalize}
+                      >
+                        ✅ Finalizare proiect
+                      </button>
+                      {!canFinalize && (
+                        <p className="text-xs text-yellow-500/80 text-center">
+                          ⚠️ Salvează înainte de finalizare: {missingItems}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 {selectedProject && projectFinalized && (
                   <div className="w-full bg-green-500/10 border border-green-500/30 text-green-400 font-semibold py-3 rounded-xl text-sm text-center">
                     ✅ Proiect finalizat
