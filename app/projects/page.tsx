@@ -1560,14 +1560,35 @@ function ProjectsPageInner() {
                   )}
                 </div>
 
-                {selectedProject && !projectFinalized && (
-                  <button
-                    className="w-full bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white font-bold py-3 rounded-xl text-sm transition shadow-lg shadow-green-900/30"
-                    onClick={handleFinalizeProject}
-                  >
-                    ✅ Finalizare proiect
-                  </button>
-                )}
+               {selectedProject && !projectFinalized && (() => {
+  const canFinalize = materialsSavedMontator && materialsSavedElectrician && montajSaved;
+  const missingItems = [
+    !materialsSavedMontator && "materiale montator",
+    !materialsSavedElectrician && "materiale electrician",
+    !montajSaved && "poze montaj",
+  ].filter(Boolean).join(", ");
+
+  return (
+    <div className="flex flex-col gap-2">
+      <button
+        className={`w-full font-bold py-3 rounded-xl text-sm transition shadow-lg ${
+          canFinalize
+            ? "bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white shadow-green-900/30"
+            : "bg-slate-700/50 border border-slate-600/50 text-slate-500 cursor-not-allowed shadow-none"
+        }`}
+        onClick={canFinalize ? handleFinalizeProject : undefined}
+        disabled={!canFinalize}
+      >
+        ✅ Finalizare proiect
+      </button>
+      {!canFinalize && (
+        <p className="text-xs text-yellow-500/80 text-center">
+          ⚠️ Salvează înainte de finalizare: {missingItems}
+        </p>
+      )}
+    </div>
+  );
+})()}
                 {selectedProject && projectFinalized && (
                   <div className="w-full bg-green-500/10 border border-green-500/30 text-green-400 font-semibold py-3 rounded-xl text-sm text-center">
                     ✅ Proiect finalizat
