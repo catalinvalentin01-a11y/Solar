@@ -74,6 +74,7 @@ function ProjectsPageInner() {
   const [open, setOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [currentUserEmail, setCurrentUserEmail] = useState("");
   const [projectFinalized, setProjectFinalized] = useState(false);
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -118,6 +119,8 @@ function ProjectsPageInner() {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [uploadingCategory, setUploadingCategory] = useState<string | null>(null);
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
+  const [projectHistory, setProjectHistory] = useState<any[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
 
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState("");
@@ -157,6 +160,7 @@ function ProjectsPageInner() {
     const check = async () => {
       const { data } = await supabase.auth.getUser();
       if (!data.user) return;
+      setCurrentUserEmail(data.user.email || "");
       if (data.user.email === SUPER_ADMIN) {
         setIsAdmin(true);
         setIsSuperAdmin(true);
@@ -252,6 +256,7 @@ function ProjectsPageInner() {
       setShowSimulation(false); setShowMaterials(false); setShowMontaj(false);
       loadProjectMaterials(p.id);
       loadMontajImages(p.id);
+      if (isSuperAdmin) loadHistory(p.id);
       setOpen(true);
     };
     tryOpen();
@@ -273,6 +278,8 @@ function ProjectsPageInner() {
     setEditingMaterialId(null);
     setEditingCategoryId(null);
     setCollapsedCategories({});
+    setProjectHistory([]);
+    setShowHistory(false);
     // Curăță ?open=ID din URL ca notificarea să poată redeschide același proiect
     router.replace("/projects");
   };
@@ -315,6 +322,7 @@ function ProjectsPageInner() {
       roof_images: form.roof_images, simulation_images: form.simulation_images,
     }).eq("id", selectedProject.id);
     if (error) { console.error(error); return; }
+    await logHistory(selectedProject.id, "✏️ Modificare date proiect");
     await loadProjects();
     resetForm();
   };
@@ -341,6 +349,7 @@ function ProjectsPageInner() {
       message: `Proiectul "${form.client} - ${form.title}" (${selectedDate || "fără dată"}) a fost marcat ca finalizat.`,
       project_id: selectedProject.id,
     });
+    await logHistory(selectedProject.id, "✅ Finalizare proiect");
     // Actualizează status_montaj în clients
     if (form.phone) {
       await supabase
@@ -359,6 +368,7 @@ function ProjectsPageInner() {
     if (!confirm("Deblochezi proiectul pentru modificare?")) return;
     const { error } = await supabase.from("projects").update({ status: "În lucru" }).eq("id", selectedProject.id);
     if (error) { alert("Eroare: " + error.message); return; }
+    await logHistory(selectedProject.id, "🔓 Deblocare proiect");
 
     // Resetează status_montaj în clients
     if (form.phone) {
@@ -371,6 +381,24 @@ function ProjectsPageInner() {
     setProjectFinalized(false);
     setForm((prev) => ({ ...prev, status: "În lucru" }));
     await loadProjects();
+  };
+
+  const logHistory = async (projectId: string, action: string, changes?: object) => {
+    await supabase.from("project_history").insert({
+      project_id: projectId,
+      modified_by: currentUserEmail,
+      action,
+      changes: changes || null,
+    });
+  };
+
+  const loadHistory = async (projectId: string) => {
+    const { data } = await supabase
+      .from("project_history")
+      .select("*")
+      .eq("project_id", projectId)
+      .order("modified_at", { ascending: false });
+    setProjectHistory(data || []);
   };
 
   const handleAddMaterial = async () => {
@@ -427,6 +455,7 @@ function ProjectsPageInner() {
     if (error) { alert("Eroare la salvare: " + error.message); return; }
     if (role === "montator") setMaterialsSavedMontator(true);
     else setMaterialsSavedElectrician(true);
+    await logHistory(selectedProject.id!, `💾 Materiale salvate (${role === "montator" ? "Montator" : "Electrician"})`);
     setProjectMaterials((prev) => prev.map((pm) => {
       const belongs = roleMaterials.some((m) => m.id === pm.material_id);
       return belongs ? { ...pm, saved: true } : pm;
@@ -721,6 +750,8 @@ function ProjectsPageInner() {
       .select().single();
     if (insertError) { console.error(insertError); setUploadingCategory(null); return; }
     if (inserted) setMontajImages((prev) => [...prev, inserted]);
+    const catName = montajCategories.find((c) => c.id === categoryId)?.name || categoryId;
+    await logHistory(selectedProject.id, `📸 Poză adăugată`, { categorie: catName });
     setUploadingCategory(null);
   };
 
@@ -951,6 +982,7 @@ function ProjectsPageInner() {
               setActiveMaterialRole("montator");
               loadProjectMaterials(info.event.id);
               loadMontajImages(info.event.id);
+              if (isSuperAdmin) loadHistory(info.event.id);
               setOpen(true);
             }}
           />
@@ -1432,6 +1464,43 @@ function ProjectsPageInner() {
                               </>
                             )}
                           </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* ── ISTORIC MODIFICĂRI (doar superadmin) ── */}
+                {isSuperAdmin && selectedProject && (
+                  <>
+                    <button
+                      className="w-full text-left flex items-center justify-between px-4 py-3 rounded-xl bg-[#0a1628] border border-[#1e3a5f] hover:border-blue-500/50 hover:bg-[#0f2235] transition-all text-sm font-semibold text-slate-300"
+                      onClick={() => setShowHistory(!showHistory)}
+                    >
+                      <span className="flex items-center gap-2">🕓 Istoric modificări</span>
+                      <span className="text-blue-500 text-xs">{showHistory ? "▲" : "▼"}</span>
+                    </button>
+                    {showHistory && (
+                      <div className="px-1 space-y-2">
+                        {projectHistory.length === 0 ? (
+                          <p className="text-sm text-slate-500 italic">Nicio modificare înregistrată.</p>
+                        ) : (
+                          projectHistory.map((h) => (
+                            <div key={h.id} className="flex flex-col gap-0.5 p-3 bg-[#0a1628] rounded-xl border border-[#1e3a5f]">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-sm text-slate-200 font-medium">{h.action}</span>
+                                <span className="text-xs text-slate-500 shrink-0">
+                                  {new Date(h.modified_at).toLocaleDateString("ro-RO")} {new Date(h.modified_at).toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" })}
+                                </span>
+                              </div>
+                              <span className="text-xs text-blue-400">{h.modified_by}</span>
+                              {h.changes && (
+                                <span className="text-xs text-slate-500 mt-0.5">
+                                  {Object.entries(h.changes).map(([k, v]) => `${k}: ${v}`).join(", ")}
+                                </span>
+                              )}
+                            </div>
+                          ))
                         )}
                       </div>
                     )}
