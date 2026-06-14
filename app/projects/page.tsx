@@ -994,7 +994,7 @@ function ProjectsPageInner() {
                     </span>
                   )}
                   <button
-                    onClick={() => setOpen(false)}
+                    onClick={resetForm}
                     className="text-slate-400 hover:text-white hover:bg-[#1e3a5f] w-8 h-8 rounded-full flex items-center justify-center transition text-lg font-bold shrink-0"
                   >
                     ✕
