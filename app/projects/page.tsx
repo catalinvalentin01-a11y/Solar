@@ -8,7 +8,7 @@ import roLocale from "@fullcalendar/core/locales/ro";
 import AuthGuard from "@/components/AuthGuard";
 import { supabase } from "@/lib/supabase";
 import ImageLightbox from "@/components/ImageLightbox";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 
 const SUPER_ADMIN = "catalinvalentin01@gmail.com";
 
@@ -76,6 +76,7 @@ function ProjectsPageInner() {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [projectFinalized, setProjectFinalized] = useState(false);
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -273,7 +274,7 @@ function ProjectsPageInner() {
     setEditingCategoryId(null);
     setCollapsedCategories({});
     // Curăță ?open=ID din URL ca notificarea să poată redeschide același proiect
-    window.history.replaceState(null, "", "/projects");
+    router.replace("/projects");
   };
 
   const handleSave = async () => {
