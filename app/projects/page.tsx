@@ -255,6 +255,8 @@ function ProjectsPageInner() {
     setEditingMaterialId(null);
     setEditingCategoryId(null);
     setCollapsedCategories({});
+    // Curăță ?open=ID din URL ca notificarea să poată redeschide același proiect
+    window.history.replaceState(null, "", "/projects");
   };
 
   const handleSave = async () => {
