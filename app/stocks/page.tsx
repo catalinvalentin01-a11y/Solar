@@ -114,7 +114,6 @@ export default function StocksPage() {
     setMovementsLoading(false);
   }
 
-  // Adaugă material nou în lista globală
   async function handleAddMaterial() {
     if (!addMaterialModal) return;
     const name = newName.trim();
@@ -132,7 +131,6 @@ export default function StocksPage() {
     await loadMaterials();
   }
 
-  // Ajustare stoc (+ sau -)
   async function handleAdjust() {
     if (!adjustModal) return;
     const qty = parseFloat(adjustQty);
@@ -161,7 +159,6 @@ export default function StocksPage() {
     await loadMaterials();
   }
 
-  // Asignează material la montator sau electrician
   async function handleAssign(role: "montator" | "electrician") {
     if (!assignModal) return;
     const { error } = await supabase
@@ -190,6 +187,182 @@ export default function StocksPage() {
     const { error } = await supabase.from("materials").delete().eq("id", id);
     if (error) { alert(error.message); return; }
     await loadMaterials();
+  }
+
+  // ── PDF EXPORT ──
+  async function handlePrintPDF() {
+    const { default: jsPDF } = await import("jspdf");
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
+    const pageW = 210;
+    const margin = 14;
+    const now = new Date();
+    const dateStr = now.toLocaleDateString("ro-RO", { day: "2-digit", month: "2-digit", year: "numeric" });
+    const timeStr = now.toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" });
+
+    // Header
+    doc.setFillColor(8, 15, 26);
+    doc.rect(0, 0, pageW, 28, "F");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.setTextColor(96, 165, 250); // blue-400
+    doc.text("Solar Blu", margin, 12);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(148, 163, 184); // slate-400
+    doc.text("CRM Intern — Gestiune Stocuri", margin, 18);
+
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Generat: ${dateStr} la ${timeStr}`, pageW - margin, 12, { align: "right" });
+    doc.text(`${materials.length} materiale în evidență`, pageW - margin, 18, { align: "right" });
+
+    // Linie separator header
+    doc.setDrawColor(30, 58, 95);
+    doc.setLineWidth(0.5);
+    doc.line(margin, 28, pageW - margin, 28);
+
+    let y = 36;
+
+    // Alerte stoc critic
+    const lowStock = materials.filter((m) => m.min_quantity > 0 && (m.quantity || 0) <= m.min_quantity);
+    if (lowStock.length > 0) {
+      doc.setFillColor(127, 29, 29, 0.15);
+      doc.setDrawColor(239, 68, 68);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(margin, y, pageW - margin * 2, 8 + lowStock.length * 5, 2, 2, "FD");
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      doc.setTextColor(248, 113, 113);
+      doc.text(`⚠ Stoc critic — ${lowStock.length} material${lowStock.length !== 1 ? "e" : ""}`, margin + 3, y + 5);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.5);
+      doc.setTextColor(252, 165, 165);
+      lowStock.forEach((m, i) => {
+        doc.text(`• ${m.name} — ${m.quantity || 0} ${m.unit} (min: ${m.min_quantity} ${m.unit})`, margin + 5, y + 10 + i * 5);
+      });
+
+      y += 12 + lowStock.length * 5 + 6;
+    }
+
+    // Funcție pentru a desena o secțiune
+    const drawSection = (title: string, emoji: string, color: [number, number, number], items: Material[]) => {
+      if (items.length === 0) return;
+
+      // Verifică dacă mai e loc pe pagina curentă
+      if (y > 250) {
+        doc.addPage();
+        y = 20;
+      }
+
+      // Titlu secțiune
+      doc.setFillColor(...color, 0.15);
+      doc.setDrawColor(...color);
+      doc.setLineWidth(0.4);
+      doc.roundedRect(margin, y, pageW - margin * 2, 9, 1.5, 1.5, "FD");
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(...color);
+      doc.text(`${emoji}  ${title}`, margin + 4, y + 6);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(148, 163, 184);
+      doc.text(`${items.length} materiale`, pageW - margin - 3, y + 6, { align: "right" });
+
+      y += 13;
+
+      // Header tabel
+      doc.setFillColor(13, 27, 42);
+      doc.rect(margin, y, pageW - margin * 2, 6, "F");
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7);
+      doc.setTextColor(100, 116, 139);
+      doc.text("MATERIAL", margin + 3, y + 4);
+      doc.text("U.M.", margin + 100, y + 4);
+      doc.text("STOC CURENT", margin + 118, y + 4);
+      doc.text("STOC MINIM", margin + 145, y + 4);
+      doc.text("STATUS", margin + 168, y + 4);
+      y += 7;
+
+      // Rânduri materiale
+      items.forEach((m, i) => {
+        if (y > 275) {
+          doc.addPage();
+          y = 20;
+        }
+
+        const rowBg = i % 2 === 0 ? [10, 22, 40] : [13, 27, 42];
+        doc.setFillColor(...rowBg as [number,number,number]);
+        doc.rect(margin, y, pageW - margin * 2, 7, "F");
+
+        const qty = m.quantity || 0;
+        const isCritic = m.min_quantity > 0 && qty <= m.min_quantity;
+        const isEmpty = qty === 0;
+
+        // Nume material
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.setTextColor(226, 232, 240);
+        doc.text(m.name, margin + 3, y + 4.8);
+
+        // U.M.
+        doc.setTextColor(100, 116, 139);
+        doc.text(m.unit, margin + 100, y + 4.8);
+
+        // Stoc curent
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8.5);
+        doc.setTextColor(isCritic ? 248 : isEmpty ? 100 : 74, isCritic ? 113 : isEmpty ? 116 : 222, isCritic ? 113 : isEmpty ? 139 : 128);
+        doc.text(String(qty), margin + 118, y + 4.8);
+
+        // Stoc minim
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7.5);
+        doc.setTextColor(100, 116, 139);
+        doc.text(m.min_quantity > 0 ? String(m.min_quantity) : "—", margin + 145, y + 4.8);
+
+        // Status badge
+        const statusLabel = isCritic ? "CRITIC" : isEmpty ? "GOL" : "OK";
+        const statusColor: [number, number, number] = isCritic ? [248, 113, 113] : isEmpty ? [100, 116, 139] : [74, 222, 128];
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(7);
+        doc.setTextColor(...statusColor);
+        doc.text(statusLabel, margin + 168, y + 4.8);
+
+        y += 7;
+      });
+
+      y += 6; // spațiu după secțiune
+    };
+
+    const montatori = materials.filter((m) => m.role === "montator");
+    const electricieni = materials.filter((m) => m.role === "electrician");
+
+    drawSection("Materiale Montator", "🔩", [59, 130, 246], montatori);
+    drawSection("Materiale Electrician", "⚡", [234, 179, 8], electricieni);
+
+    // Footer pe fiecare pagină
+    const totalPages = doc.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      doc.setDrawColor(30, 58, 95);
+      doc.setLineWidth(0.3);
+      doc.line(margin, 287, pageW - margin, 287);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7);
+      doc.setTextColor(71, 85, 105);
+      doc.text("Solar Blu CRM — Raport Stocuri", margin, 292);
+      doc.text(`Pagina ${i} / ${totalPages}`, pageW - margin, 292, { align: "right" });
+    }
+
+    doc.save(`stocuri-solar-blu-${dateStr.replace(/\./g, "-")}.pdf`);
   }
 
   const filtered = materials.filter((m) => {
@@ -242,6 +415,21 @@ export default function StocksPage() {
               <p className="text-xs text-slate-500">{materials.length} materiale în evidență</p>
             </div>
           </div>
+
+          {/* Buton PDF */}
+          <button
+            onClick={handlePrintPDF}
+            className="flex items-center gap-2 bg-slate-700/50 border border-slate-600/50 text-slate-300 hover:bg-slate-700 hover:text-white px-4 py-2 rounded-xl text-sm font-semibold transition"
+            title="Descarcă PDF stocuri"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="12" y1="18" x2="12" y2="12"/>
+              <polyline points="9 15 12 18 15 15"/>
+            </svg>
+            Export PDF
+          </button>
         </div>
 
         {/* Alerte stoc minim */}
@@ -335,7 +523,6 @@ export default function StocksPage() {
                     </div>
                   ) : (
                     <div className="flex items-center gap-3">
-                      {/* Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-semibold text-slate-200 text-sm">{mat.name}</span>
@@ -355,7 +542,6 @@ export default function StocksPage() {
                         </div>
                       </div>
 
-                      {/* Actiuni */}
                       <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
                         <button
                           className="bg-green-500/20 border border-green-500/40 text-green-400 w-8 h-8 rounded-lg text-lg font-bold hover:bg-green-500/30 transition flex items-center justify-center"
