@@ -153,6 +153,20 @@ export default function StocksPage() {
       note: adjustNote || null,
     });
 
+    // Notificare automată dacă stocul a atins sau depășit minimul
+    const mat = adjustModal.material;
+    const prevQty = mat.quantity || 0;
+    const wasOk = mat.min_quantity <= 0 || prevQty > mat.min_quantity;
+    const nowCritic = mat.min_quantity > 0 && newQty <= mat.min_quantity;
+    if (wasOk && nowCritic) {
+      await supabase.from("notifications").insert({
+        title: "⚠️ Stoc critic",
+        message: `${mat.name} a ajuns la ${newQty} ${mat.unit} (minim: ${mat.min_quantity} ${mat.unit}). Comandă stoc!`,
+        project_id: null,
+        read: false,
+      });
+    }
+
     setAdjustModal(null);
     setAdjustQty("");
     setAdjustNote("");
