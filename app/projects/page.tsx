@@ -323,6 +323,7 @@ function ProjectsPageInner() {
     }).eq("id", selectedProject.id);
     if (error) { console.error(error); return; }
     await logHistory(selectedProject.id, "✏️ Modificare date proiect");
+    await loadHistory(selectedProject.id);
     await loadProjects();
     resetForm();
   };
@@ -369,6 +370,7 @@ function ProjectsPageInner() {
     const { error } = await supabase.from("projects").update({ status: "În lucru" }).eq("id", selectedProject.id);
     if (error) { alert("Eroare: " + error.message); return; }
     await logHistory(selectedProject.id, "🔓 Deblocare proiect");
+    await loadHistory(selectedProject.id);
 
     // Resetează status_montaj în clients
     if (form.phone) {
@@ -456,6 +458,7 @@ function ProjectsPageInner() {
     if (role === "montator") setMaterialsSavedMontator(true);
     else setMaterialsSavedElectrician(true);
     await logHistory(selectedProject.id!, `💾 Materiale salvate (${role === "montator" ? "Montator" : "Electrician"})`);
+    if (isSuperAdmin) await loadHistory(selectedProject.id!);
     setProjectMaterials((prev) => prev.map((pm) => {
       const belongs = roleMaterials.some((m) => m.id === pm.material_id);
       return belongs ? { ...pm, saved: true } : pm;
@@ -752,6 +755,7 @@ function ProjectsPageInner() {
     if (inserted) setMontajImages((prev) => [...prev, inserted]);
     const catName = montajCategories.find((c) => c.id === categoryId)?.name || categoryId;
     await logHistory(selectedProject.id, `📸 Poză adăugată`, { categorie: catName });
+    if (isSuperAdmin) await loadHistory(selectedProject.id);
     setUploadingCategory(null);
   };
 
