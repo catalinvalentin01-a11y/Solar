@@ -279,6 +279,28 @@ function ProjectsPageInner() {
   const handleSave = async () => {
     const { error } = await supabase.from("projects").insert({ ...form, date: selectedDate }).select();
     if (error) { alert(error.message); return; }
+
+    // Adaugă automat clientul dacă nu există deja (verifică după telefon)
+    if (form.client.trim()) {
+      const { data: existing } = await supabase
+        .from("clients")
+        .select("id")
+        .eq("phone", form.phone || "")
+        .maybeSingle();
+
+      if (!existing) {
+        await supabase.from("clients").insert({
+          name: form.client,
+          phone: form.phone || null,
+          email: form.email || null,
+          address: form.location || null,
+          data_montaj: selectedDate || null,
+          status_montaj: "În așteptare",
+          status: "Activ",
+        });
+      }
+    }
+
     resetForm();
     await loadProjects();
   };
