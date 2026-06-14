@@ -340,6 +340,14 @@ function ProjectsPageInner() {
       message: `Proiectul "${form.client} - ${form.title}" (${selectedDate || "fără dată"}) a fost marcat ca finalizat.`,
       project_id: selectedProject.id,
     });
+    // Actualizează status_montaj în clients
+    if (form.phone) {
+      await supabase
+        .from("clients")
+        .update({ status_montaj: "Efectuat" })
+        .eq("phone", form.phone);
+    }
+
     setProjectFinalized(true);
     setForm((prev) => ({ ...prev, status: "Finalizat" }));
     await loadProjects();
