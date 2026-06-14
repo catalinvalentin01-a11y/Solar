@@ -852,11 +852,19 @@ function ProjectsPageInner() {
                     )}
                   </div>
                 </div>
-                {form.status && selectedProject && (
-                  <span className={`text-xs font-semibold px-3 py-1 rounded-full ${statusBadge(form.status)}`}>
-                    {form.status}
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {form.status && selectedProject && (
+                    <span className={`text-xs font-semibold px-3 py-1 rounded-full ${statusBadge(form.status)}`}>
+                      {form.status}
+                    </span>
+                  )}
+                  <button
+                    onClick={() => setOpen(false)}
+                    className="text-slate-400 hover:text-white hover:bg-[#1e3a5f] w-8 h-8 rounded-full flex items-center justify-center transition text-lg font-bold shrink-0"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
 
               <div className="p-4 md:p-5 space-y-3">
