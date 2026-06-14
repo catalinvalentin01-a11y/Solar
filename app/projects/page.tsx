@@ -358,6 +358,15 @@ function ProjectsPageInner() {
     if (!confirm("Deblochezi proiectul pentru modificare?")) return;
     const { error } = await supabase.from("projects").update({ status: "În lucru" }).eq("id", selectedProject.id);
     if (error) { alert("Eroare: " + error.message); return; }
+
+    // Resetează status_montaj în clients
+    if (form.phone) {
+      await supabase
+        .from("clients")
+        .update({ status_montaj: "În așteptare" })
+        .eq("phone", form.phone);
+    }
+
     setProjectFinalized(false);
     setForm((prev) => ({ ...prev, status: "În lucru" }));
     await loadProjects();
