@@ -1532,20 +1532,19 @@ function ProjectsPageInner() {
                                   </>
                                 ) : (
                                   <>
-                                    <span className="flex-1 text-sm font-medium text-slate-200 min-w-0">
-                                      {mat.name}
-                                      <span className="text-slate-500 ml-1 text-xs">({mat.unit})</span>
-                                    </span>
-                                    {/* Afișăm stocul disponibil dacă suntem admin */}
-                                    {isAdmin && mat.quantity !== undefined && (
-                                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${
-                                        mat.quantity <= (mat.min_quantity ?? 0)
-                                          ? "bg-red-500/20 text-red-400 border border-red-500/30"
-                                          : "bg-slate-700/50 text-slate-400"
-                                      }`}>
-                                        Stoc: {mat.quantity} {mat.unit}
-                                      </span>
-                                    )}
+                                   <span className="flex-1 text-sm font-medium text-slate-200 min-w-0">
+  <span className="block">{mat.name}</span>
+  <span className="text-slate-500 text-xs">({mat.unit})</span>
+  {mat.quantity !== undefined && (
+    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full inline-block mt-0.5 ${
+      mat.quantity <= (mat.min_quantity ?? 0)
+        ? "bg-red-500/20 text-red-400 border border-red-500/30"
+        : "bg-slate-700/50 text-slate-400"
+    }`}>
+      Stoc: {mat.quantity} {mat.unit}
+    </span>
+  )}
+</span>
                                     <input
                                       type="number" min="0"
                                       className={`border p-2 rounded-xl text-sm text-center w-20 shrink-0 outline-none transition ${(materialsSaved && !isAdmin) || projectFinalized ? "bg-[#0a1628] border-[#1e3a5f] text-slate-500 cursor-not-allowed" : "bg-[#0d2137] border-[#1e3a5f] text-slate-200 focus:border-blue-500"}`}
