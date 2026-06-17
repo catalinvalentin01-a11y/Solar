@@ -482,6 +482,28 @@ function ProjectsPageInner() {
     // Calculăm diferențele față de valorile anterior salvate
     const stockUpdates: { material_id: string; delta: number }[] = [];
 
+    // Verificăm stocul disponibil înainte de salvare
+    const insufficientMaterials: string[] = [];
+    for (const mat of roleMaterials) {
+      const newQty = parseFloat(quantities[mat.id] || "0") || 0;
+      const existing = projectMaterials.find((pm) => pm.material_id === mat.id);
+      const prevQty = existing?.saved ? parseFloat(existing.quantity || "0") || 0 : 0;
+      const delta = newQty - prevQty;
+      if (delta > 0) {
+        // Verificăm stocul curent din materiale
+        const currentMat = materials.find((m) => m.id === mat.id);
+        const currentStock = currentMat?.quantity ?? 0;
+        if (delta > currentStock) {
+          insufficientMaterials.push(`${mat.name}: necesar ${delta} ${mat.unit}, disponibil ${currentStock} ${mat.unit}`);
+        }
+      }
+    }
+
+    if (insufficientMaterials.length > 0) {
+      alert(`❌ Stoc insuficient pentru:\n\n${insufficientMaterials.join("\n")}\n\nReduceți cantitățile sau aprovizionați stocul.`);
+      return;
+    }
+
     for (const mat of roleMaterials) {
       const newQty = parseFloat(quantities[mat.id] || "0") || 0;
       const existing = projectMaterials.find((pm) => pm.material_id === mat.id);
@@ -519,7 +541,7 @@ function ProjectsPageInner() {
 
       if (stockRow) {
         const currentStock = parseFloat(stockRow.quantity) || 0;
-        const newStock = Math.max(0, currentStock - delta); // nu lăsăm stocul negativ
+        const newStock = currentStock - delta; // delta validat anterior, stocul nu poate fi negativ
         await supabase
           .from("materials")
           .update({ quantity: newStock })

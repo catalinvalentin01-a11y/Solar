@@ -251,13 +251,13 @@ export default function StocksPage() {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(8);
       doc.setTextColor(248, 113, 113);
-      doc.text(`⚠ Stoc critic — ${lowStock.length} material${lowStock.length !== 1 ? "e" : ""}`, margin + 3, y + 5);
+      doc.text(`! Stoc critic — ${lowStock.length} material${lowStock.length !== 1 ? "e" : ""}`, margin + 3, y + 5);
 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(7.5);
       doc.setTextColor(252, 165, 165);
       lowStock.forEach((m, i) => {
-        doc.text(`• ${m.name} — ${m.quantity || 0} ${m.unit} (min: ${m.min_quantity} ${m.unit})`, margin + 5, y + 10 + i * 5);
+        doc.text(`- ${m.name} — ${m.quantity || 0} ${m.unit} (min: ${m.min_quantity} ${m.unit})`, margin + 5, y + 10 + i * 5);
       });
 
       y += 12 + lowStock.length * 5 + 6;
@@ -282,7 +282,7 @@ export default function StocksPage() {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10);
       doc.setTextColor(...color);
-      doc.text(`${emoji}  ${title}`, margin + 4, y + 6);
+      doc.text(`>> ${title}`, margin + 4, y + 6);
 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8);
@@ -360,9 +360,9 @@ export default function StocksPage() {
     const electricieni = materials.filter((m) => m.role === "electrician");
     const hala = materials.filter((m) => m.role === "hala");
 
-    drawSection("Materiale Montator", "🔩", [59, 130, 246], montatori);
-    drawSection("Materiale Electrician", "⚡", [234, 179, 8], electricieni);
-    drawSection("Materiale Hală", "🏪", [168, 85, 247], hala);
+    drawSection("Materiale Montator", "[M]", [59, 130, 246], montatori);
+    drawSection("Materiale Electrician", "[E]", [234, 179, 8], electricieni);
+    drawSection("Materiale Hala", "[H]", [168, 85, 247], hala);
 
     // Footer pe fiecare pagină
     const totalPages = doc.getNumberOfPages();
