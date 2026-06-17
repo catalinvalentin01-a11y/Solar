@@ -867,15 +867,50 @@ function ProjectsPageInner() {
     await saveOrderToDB(reordered);
   };
 
+  // Comprimă o imagine în browser (canvas) înainte de upload: max 2400px lățime/înălțime, calitate JPEG 90%.
+  // Pentru fișiere care nu sunt imagine (ex: PDF) returnează fișierul original neschimbat.
+  const compressImage = (file: File, maxDimension = 2400, quality = 0.9): Promise<File> => {
+    return new Promise((resolve) => {
+      if (!file.type.startsWith("image/")) { resolve(file); return; }
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        let { width, height } = img;
+        if (width <= maxDimension && height <= maxDimension) { resolve(file); return; }
+        if (width > height) { height = Math.round((height * maxDimension) / width); width = maxDimension; }
+        else { width = Math.round((width * maxDimension) / height); height = maxDimension; }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { resolve(file); return; }
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) { resolve(file); return; }
+            const compressedFile = new File([blob], file.name, { type: "image/jpeg" });
+            resolve(compressedFile);
+          },
+          "image/jpeg",
+          quality
+        );
+      };
+      img.onerror = () => { URL.revokeObjectURL(objectUrl); resolve(file); };
+      img.src = objectUrl;
+    });
+  };
+
   const uploadMontajImage = async (file: File, categoryId: string) => {
     if (!selectedProject?.id) return;
     setUploadingCategory(categoryId);
+    const compressedFile = await compressImage(file);
     const safeName = file.name
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .replace(/[^a-zA-Z0-9._-]/g, "-");
     const fileName = `montaj/${Date.now()}-${safeName}`;
-    const { error } = await supabase.storage.from("project-images").upload(fileName, file);
+    const { error } = await supabase.storage.from("project-images").upload(fileName, compressedFile);
     if (error) { console.error(error); setUploadingCategory(null); return; }
     const { data } = supabase.storage.from("project-images").getPublicUrl(fileName);
     const { data: inserted, error: insertError } = await supabase
@@ -934,12 +969,13 @@ function ProjectsPageInner() {
   };
 
   const uploadImage = async (file: File, target: "roof" | "simulation") => {
+    const compressedFile = await compressImage(file);
     const safeName = file.name
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .replace(/[^a-zA-Z0-9._-]/g, "-");
     const fileName = Date.now() + "-" + safeName;
-    const { error } = await supabase.storage.from("project-images").upload(fileName, file);
+    const { error } = await supabase.storage.from("project-images").upload(fileName, compressedFile);
     if (error) { console.error(error); return; }
     const { data } = supabase.storage.from("project-images").getPublicUrl(fileName);
     if (target === "roof") setForm((prev) => ({ ...prev, roof_images: [...prev.roof_images, data.publicUrl] }));
@@ -1288,7 +1324,7 @@ function ProjectsPageInner() {
                           )}
                           <div className="grid grid-cols-3 gap-2">
                             {form.roof_images.map((img, i) => (
-                              <img key={img} src={img} alt="" onClick={() => { setLightboxImages(form.roof_images); setActiveIndex(i); setLightboxCanDelete(isAdmin && !projectFinalized); setLightboxCategoryId(null); setOpenLightbox(true); }}
+                              <img key={img} src={img} alt="" loading="lazy" onClick={() => { setLightboxImages(form.roof_images); setActiveIndex(i); setLightboxCanDelete(isAdmin && !projectFinalized); setLightboxCategoryId(null); setOpenLightbox(true); }}
                                 className="rounded-xl border border-[#1e3a5f] h-28 w-full object-cover cursor-pointer hover:border-blue-500/50 transition" />
                             ))}
                           </div>
@@ -1301,14 +1337,41 @@ function ProjectsPageInner() {
                           {isAdmin && !projectFinalized && (
                             <label className="inline-flex items-center gap-2 cursor-pointer bg-blue-500/10 border border-blue-500/30 text-blue-400 px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-500/20 transition mb-3">
                               📁 Adaugă simulare
-                              <input type="file" accept="image/*" className="hidden" onChange={async (e) => { const file = e.target.files?.[0]; if (file) await uploadImage(file, "simulation"); }} />
+                              <input type="file" accept="image/*,application/pdf" className="hidden" onChange={async (e) => { const file = e.target.files?.[0]; if (file) await uploadImage(file, "simulation"); e.target.value = ""; }} />
                             </label>
                           )}
                           <div className="grid grid-cols-3 gap-2">
-                            {form.simulation_images.map((img, i) => (
-                              <img key={img} src={img} alt="" onClick={() => { setLightboxImages(form.simulation_images); setActiveIndex(i); setLightboxCanDelete(isAdmin && !projectFinalized); setLightboxCategoryId(null); setOpenLightbox(true); }}
-                                className="rounded-xl border border-[#1e3a5f] h-28 w-full object-cover cursor-pointer hover:border-blue-500/50 transition" />
-                            ))}
+                            {form.simulation_images.map((img) => {
+                              const isPdf = img.toLowerCase().endsWith(".pdf");
+                              if (isPdf) {
+                                const fileName = img.split("/").pop() || "fisier.pdf";
+                                return (
+                                  <div key={img} className="relative group">
+                                    <a
+                                      href={img}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="rounded-xl border border-[#1e3a5f] h-28 w-full flex flex-col items-center justify-center gap-1 bg-[#0a1628] hover:border-blue-500/50 transition p-2 text-center"
+                                    >
+                                      <span className="text-2xl">📄</span>
+                                      <span className="text-[10px] text-slate-400 break-all line-clamp-2">{fileName}</span>
+                                    </a>
+                                    {isAdmin && !projectFinalized && (
+                                      <button
+                                        className="absolute top-1 right-1 bg-red-500/80 text-white rounded-full w-6 h-6 text-xs font-bold opacity-0 group-hover:opacity-100 transition flex items-center justify-center backdrop-blur-sm"
+                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteImage(img, "simulation"); }}
+                                      >✕</button>
+                                    )}
+                                  </div>
+                                );
+                              }
+                              const imageOnlyList = form.simulation_images.filter((i) => !i.toLowerCase().endsWith(".pdf"));
+                              const imgIndex = imageOnlyList.indexOf(img);
+                              return (
+                                <img key={img} src={img} alt="" loading="lazy" onClick={() => { setLightboxImages(imageOnlyList); setActiveIndex(imgIndex); setLightboxCanDelete(isAdmin && !projectFinalized); setLightboxCategoryId(null); setOpenLightbox(true); }}
+                                  className="rounded-xl border border-[#1e3a5f] h-28 w-full object-cover cursor-pointer hover:border-blue-500/50 transition" />
+                              );
+                            })}
                           </div>
                         </div>
                       )}
@@ -1425,7 +1488,7 @@ function ProjectsPageInner() {
                                           {catImages.map((img, i) => (
                                             <div key={img.id} className="relative group">
                                               <img
-                                                src={img.url} alt=""
+                                                src={img.url} alt="" loading="lazy"
                                                 className="rounded-xl border border-[#1e3a5f] h-28 w-full object-cover cursor-pointer hover:border-blue-500/50 transition"
                                                 onClick={() => { setLightboxImages(catImages.map((ci) => ci.url)); setActiveIndex(i); setLightboxCanDelete(!montajSaved && !projectFinalized); setLightboxCategoryId(cat.id); setOpenLightbox(true); }}
                                               />

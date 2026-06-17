@@ -32,7 +32,7 @@ type AdjustModal = {
 } | null;
 
 type AddMaterialModal = {
-  role: "montator" | "electrician";
+  role: "montator" | "electrician" | "hala";
 } | null;
 
 type AssignModal = {
@@ -45,7 +45,7 @@ export default function StocksPage() {
   const [loading, setLoading] = useState(true);
 
   const [materials, setMaterials] = useState<Material[]>([]);
-  const [activeTab, setActiveTab] = useState<"all" | "montator" | "electrician">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "montator" | "electrician" | "hala">("all");
 
   const [adjustModal, setAdjustModal] = useState<AdjustModal>(null);
   const [adjustQty, setAdjustQty] = useState("");
@@ -173,7 +173,7 @@ export default function StocksPage() {
     await loadMaterials();
   }
 
-  async function handleAssign(role: "montator" | "electrician") {
+  async function handleAssign(role: "montator" | "electrician" | "hala") {
     if (!assignModal) return;
     const { error } = await supabase
       .from("materials")
@@ -358,9 +358,11 @@ export default function StocksPage() {
 
     const montatori = materials.filter((m) => m.role === "montator");
     const electricieni = materials.filter((m) => m.role === "electrician");
+    const hala = materials.filter((m) => m.role === "hala");
 
     drawSection("Materiale Montator", "🔩", [59, 130, 246], montatori);
     drawSection("Materiale Electrician", "⚡", [234, 179, 8], electricieni);
+    drawSection("Materiale Hală", "🏪", [168, 85, 247], hala);
 
     // Footer pe fiecare pagină
     const totalPages = doc.getNumberOfPages();
@@ -377,6 +379,97 @@ export default function StocksPage() {
     }
 
     doc.save(`stocuri-solar-blu-${dateStr.replace(/\./g, "-")}.pdf`);
+  }
+
+  // ── PRINT BROWSER ──
+  function handlePrintBrowser() {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString("ro-RO", { day: "2-digit", month: "2-digit", year: "numeric" });
+    const timeStr = now.toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" });
+
+    const montatori = materials.filter((m) => m.role === "montator");
+    const electricieni = materials.filter((m) => m.role === "electrician");
+    const hala = materials.filter((m) => m.role === "hala");
+
+    const renderRows = (items: Material[]) =>
+      items.map((m) => {
+        const qty = m.quantity || 0;
+        const isCritic = m.min_quantity > 0 && qty <= m.min_quantity;
+        const isEmpty = qty === 0;
+        const status = isCritic ? "CRITIC" : isEmpty ? "GOL" : "OK";
+        const statusColor = isCritic ? "#dc2626" : isEmpty ? "#64748b" : "#16a34a";
+        return `
+          <tr>
+            <td>${m.name}</td>
+            <td>${m.unit}</td>
+            <td style="font-weight:bold; color:${isCritic ? "#dc2626" : isEmpty ? "#64748b" : "#111"};">${qty}</td>
+            <td>${m.min_quantity > 0 ? m.min_quantity : "—"}</td>
+            <td style="font-weight:bold; color:${statusColor};">${status}</td>
+          </tr>`;
+      }).join("");
+
+    const renderSection = (title: string, emoji: string, items: Material[]) => {
+      if (items.length === 0) return "";
+      return `
+        <h2>${emoji} ${title} <span class="count">(${items.length} materiale)</span></h2>
+        <table>
+          <thead>
+            <tr><th>Material</th><th>U.M.</th><th>Stoc curent</th><th>Stoc minim</th><th>Status</th></tr>
+          </thead>
+          <tbody>${renderRows(items)}</tbody>
+        </table>`;
+    };
+
+    const lowStockList = materials.filter((m) => m.min_quantity > 0 && (m.quantity || 0) <= m.min_quantity);
+    const alertHtml = lowStockList.length > 0 ? `
+      <div class="alert">
+        <strong>⚠ Stoc critic — ${lowStockList.length} material${lowStockList.length !== 1 ? "e" : ""}</strong>
+        <ul>${lowStockList.map((m) => `<li>${m.name} — ${m.quantity || 0} ${m.unit} (min: ${m.min_quantity} ${m.unit})</li>`).join("")}</ul>
+      </div>` : "";
+
+    const html = `
+      <!DOCTYPE html>
+      <html lang="ro">
+      <head>
+        <meta charset="UTF-8" />
+        <title>Stocuri Solar Blu — ${dateStr}</title>
+        <style>
+          * { box-sizing: border-box; }
+          body { font-family: Arial, Helvetica, sans-serif; color: #111; padding: 24px; }
+          h1 { font-size: 20px; margin: 0 0 2px; }
+          .subtitle { color: #555; font-size: 12px; margin: 0 0 16px; }
+          .meta { text-align: right; font-size: 11px; color: #555; margin-bottom: 12px; }
+          h2 { font-size: 14px; margin: 20px 0 8px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+          .count { font-size: 11px; color: #777; font-weight: normal; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+          th, td { text-align: left; padding: 6px 8px; font-size: 12px; border-bottom: 1px solid #eee; }
+          th { background: #f3f4f6; font-size: 10px; text-transform: uppercase; color: #666; }
+          .alert { background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 10px 14px; margin-bottom: 18px; font-size: 12px; color: #b91c1c; }
+          .alert ul { margin: 6px 0 0; padding-left: 18px; }
+          @media print {
+            body { padding: 0; }
+          }
+        </style>
+      </head>
+      <body>
+        <h1>Solar Blu — Gestiune Stocuri</h1>
+        <p class="subtitle">CRM Intern</p>
+        <div class="meta">Generat: ${dateStr} la ${timeStr} &nbsp;|&nbsp; ${materials.length} materiale în evidență</div>
+        ${alertHtml}
+        ${renderSection("Materiale Montator", "🔩", montatori)}
+        ${renderSection("Materiale Electrician", "⚡", electricieni)}
+        ${renderSection("Materiale Hală", "🏪", hala)}
+      </body>
+      </html>`;
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) { alert("Permite ferestrele pop-up pentru a printa."); return; }
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.onload = () => {
+      printWindow.focus();
+      printWindow.print();
+    };
   }
 
   const filtered = materials.filter((m) => {
@@ -402,6 +495,7 @@ export default function StocksPage() {
   const roleBadge = (role: string) => {
     if (role === "montator") return "bg-blue-500/10 text-blue-400 border border-blue-500/30";
     if (role === "electrician") return "bg-yellow-500/10 text-yellow-400 border border-yellow-500/30";
+    if (role === "hala") return "bg-purple-500/10 text-purple-400 border border-purple-500/30";
     return "bg-slate-500/10 text-slate-400 border border-slate-500/30";
   };
 
@@ -430,20 +524,36 @@ export default function StocksPage() {
             </div>
           </div>
 
-          {/* Buton PDF */}
-          <button
-            onClick={handlePrintPDF}
-            className="flex items-center gap-2 bg-slate-700/50 border border-slate-600/50 text-slate-300 hover:bg-slate-700 hover:text-white px-4 py-2 rounded-xl text-sm font-semibold transition"
-            title="Descarcă PDF stocuri"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-              <line x1="12" y1="18" x2="12" y2="12"/>
-              <polyline points="9 15 12 18 15 15"/>
-            </svg>
-            Export PDF
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Buton Print */}
+            <button
+              onClick={handlePrintBrowser}
+              className="flex items-center gap-2 bg-slate-700/50 border border-slate-600/50 text-slate-300 hover:bg-slate-700 hover:text-white px-4 py-2 rounded-xl text-sm font-semibold transition"
+              title="Printează stocuri"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="6 9 6 2 18 2 18 9"/>
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+                <rect x="6" y="14" width="12" height="8"/>
+              </svg>
+              Print
+            </button>
+
+            {/* Buton PDF */}
+            <button
+              onClick={handlePrintPDF}
+              className="flex items-center gap-2 bg-slate-700/50 border border-slate-600/50 text-slate-300 hover:bg-slate-700 hover:text-white px-4 py-2 rounded-xl text-sm font-semibold transition"
+              title="Descarcă PDF stocuri"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="12" y1="18" x2="12" y2="12"/>
+                <polyline points="9 15 12 18 15 15"/>
+              </svg>
+              Export PDF
+            </button>
+          </div>
         </div>
 
         {/* Alerte stoc minim */}
@@ -462,7 +572,7 @@ export default function StocksPage() {
 
         {/* Tabs */}
         <div className="flex gap-1 mb-4 bg-[#0a1628] p-1 rounded-xl border border-[#1e3a5f]">
-          {(["all", "montator", "electrician"] as const).map((tab) => (
+          {(["all", "montator", "electrician", "hala"] as const).map((tab) => (
             <button
               key={tab}
               className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition ${
@@ -472,7 +582,7 @@ export default function StocksPage() {
               }`}
               onClick={() => setActiveTab(tab)}
             >
-              {tab === "all" ? "🏭 Toate" : tab === "montator" ? "🔩 Montator" : "⚡ Electrician"}
+              {tab === "all" ? "🏭 Toate" : tab === "montator" ? "🔩 Montator" : tab === "electrician" ? "⚡ Electrician" : "🏪 Hală"}
               <span className="ml-1.5 text-xs opacity-70">
                 ({tab === "all" ? materials.length : materials.filter((m) => m.role === tab).length})
               </span>
@@ -493,6 +603,12 @@ export default function StocksPage() {
             onClick={() => setAddMaterialModal({ role: "electrician" })}
           >
             + Material Electrician
+          </button>
+          <button
+            className="flex items-center gap-2 bg-purple-500/10 border border-purple-500/30 text-purple-400 px-4 py-2 rounded-xl text-sm font-semibold hover:bg-purple-500/20 transition"
+            onClick={() => setAddMaterialModal({ role: "hala" })}
+          >
+            + Material Hală
           </button>
         </div>
 
@@ -541,7 +657,7 @@ export default function StocksPage() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-semibold text-slate-200 text-sm">{mat.name}</span>
                           <span className={`text-xs px-2 py-0.5 rounded-full border ${roleBadge(mat.role)}`}>
-                            {mat.role === "montator" ? "🔩 Montator" : "⚡ Electrician"}
+                            {mat.role === "montator" ? "🔩 Montator" : mat.role === "electrician" ? "⚡ Electrician" : "🏪 Hală"}
                           </span>
                         </div>
                         <div className="flex items-center gap-3 mt-1">
@@ -646,8 +762,8 @@ export default function StocksPage() {
               <h3 className="font-bold text-white text-lg mb-1">↔️ Asignează rol</h3>
               <p className="text-sm text-slate-400 mb-4">{assignModal.material.name}</p>
               <p className="text-xs text-slate-500 mb-4">
-                Rol curent: <span className={`font-semibold ${assignModal.material.role === "montator" ? "text-blue-400" : "text-yellow-400"}`}>
-                  {assignModal.material.role === "montator" ? "🔩 Montator" : "⚡ Electrician"}
+                Rol curent: <span className={`font-semibold ${assignModal.material.role === "montator" ? "text-blue-400" : assignModal.material.role === "electrician" ? "text-yellow-400" : "text-purple-400"}`}>
+                  {assignModal.material.role === "montator" ? "🔩 Montator" : assignModal.material.role === "electrician" ? "⚡ Electrician" : "🏪 Hală"}
                 </span>
               </p>
               <div className="flex gap-2">
@@ -659,6 +775,10 @@ export default function StocksPage() {
                   className="flex-1 bg-yellow-500/20 border border-yellow-500/40 text-yellow-400 py-3 rounded-xl text-sm font-semibold hover:bg-yellow-500/30 transition"
                   onClick={() => handleAssign("electrician")}
                 >⚡ Electrician</button>
+                <button
+                  className="flex-1 bg-purple-500/20 border border-purple-500/40 text-purple-400 py-3 rounded-xl text-sm font-semibold hover:bg-purple-500/30 transition"
+                  onClick={() => handleAssign("hala")}
+                >🏪 Hală</button>
               </div>
               <button className="w-full mt-2 bg-[#1e3a5f] text-slate-300 py-2.5 rounded-xl text-sm font-semibold hover:bg-[#2a4a6f] transition" onClick={() => setAssignModal(null)}>Anulează</button>
             </div>
@@ -671,7 +791,7 @@ export default function StocksPage() {
             <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setAddMaterialModal(null)} />
             <div className="relative bg-[#0d1b2a] border border-[#1e3a5f] rounded-2xl p-6 w-[90vw] max-w-sm z-[10000] shadow-2xl">
               <h3 className="font-bold text-white text-lg mb-1">
-                {addMaterialModal.role === "montator" ? "🔩 Material Montator" : "⚡ Material Electrician"}
+                {addMaterialModal.role === "montator" ? "🔩 Material Montator" : addMaterialModal.role === "electrician" ? "⚡ Material Electrician" : "🏪 Material Hală"}
               </h3>
               <p className="text-sm text-slate-400 mb-4">Adaugă material nou în stoc</p>
               <div className="space-y-3">
