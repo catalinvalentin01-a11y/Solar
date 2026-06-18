@@ -1009,8 +1009,15 @@ function ProjectsPageInner() {
   };
 
   const handleCall = (phone: string) => { if (phone) window.location.href = `tel:${phone}`; };
+  const [navMenuOpen, setNavMenuOpen] = useState(false);
   const handleMaps = (location: string) => {
     if (location) window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`, "_blank");
+  };
+  const handleWaze = (location: string) => {
+    if (location) window.open(`https://waze.com/ul?q=${encodeURIComponent(location)}&navigate=yes`, "_blank");
+  };
+  const handleAppleMaps = (location: string) => {
+    if (location) window.open(`https://maps.apple.com/?q=${encodeURIComponent(location)}`, "_blank");
   };
 
   const statusBadge = (status: string) => {
@@ -1245,12 +1252,40 @@ function ProjectsPageInner() {
                       </button>
                     )}
                     {form.location && (
-                      <button
-                        className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/30 text-blue-400 px-4 py-2 rounded-lg font-medium hover:bg-blue-500/20 transition text-sm"
-                        onClick={() => handleMaps(form.location)}
-                      >
-                        📍 {form.location}
-                      </button>
+                      <div className="relative">
+                        <button
+                          className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/30 text-blue-400 px-4 py-2 rounded-lg font-medium hover:bg-blue-500/20 transition text-sm"
+                          onClick={() => setNavMenuOpen((v) => !v)}
+                        >
+                          📍 {form.location}
+                          <span className="text-blue-400/50 text-xs">▾</span>
+                        </button>
+                        {navMenuOpen && (
+                          <>
+                            <div className="fixed inset-0 z-[999]" onClick={() => setNavMenuOpen(false)} />
+                            <div className="absolute left-0 top-full mt-1 z-[1000] bg-[#0d1b2a] border border-[#1e3a5f] rounded-xl shadow-2xl overflow-hidden min-w-[180px]">
+                              <button
+                                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-200 hover:bg-[#1e3a5f] transition text-left"
+                                onClick={() => { handleMaps(form.location); setNavMenuOpen(false); }}
+                              >
+                                🗺️ Google Maps
+                              </button>
+                              <button
+                                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-200 hover:bg-[#1e3a5f] transition text-left border-t border-[#1e3a5f]"
+                                onClick={() => { handleWaze(form.location); setNavMenuOpen(false); }}
+                              >
+                                🚗 Waze
+                              </button>
+                              <button
+                                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-200 hover:bg-[#1e3a5f] transition text-left border-t border-[#1e3a5f]"
+                                onClick={() => { handleAppleMaps(form.location); setNavMenuOpen(false); }}
+                              >
+                                🍎 Apple Maps
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
