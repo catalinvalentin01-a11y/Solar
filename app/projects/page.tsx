@@ -111,6 +111,7 @@ function ProjectsPageInner() {
   const [newMaterialName, setNewMaterialName] = useState("");
   const [newMaterialUnit, setNewMaterialUnit] = useState("buc");
   const [autoSaving, setAutoSaving] = useState(false);
+  const [savedFlashIds, setSavedFlashIds] = useState<Set<string>>(new Set());
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   const [editingMaterialId, setEditingMaterialId] = useState<string | null>(null);
@@ -464,6 +465,14 @@ function ProjectsPageInner() {
         if (data) setProjectMaterials((prev) => [...prev, data]);
       }
       setAutoSaving(false);
+      setSavedFlashIds((prev) => new Set(prev).add(materialId));
+      setTimeout(() => {
+        setSavedFlashIds((prev) => {
+          const next = new Set(prev);
+          next.delete(materialId);
+          return next;
+        });
+      }, 1200);
     },
     [selectedProject]
   );
@@ -1646,7 +1655,14 @@ function ProjectsPageInner() {
                         ) : (
                           <div className="space-y-2">
                             {activeMaterials.map((mat) => (
-                              <div key={mat.id} className="flex items-center gap-2 p-2.5 bg-[#0a1628] rounded-xl border border-[#1e3a5f]">
+                              <div
+                                key={mat.id}
+                                className={`flex items-center gap-2 p-2.5 rounded-xl border transition-colors duration-500 ${
+                                  savedFlashIds.has(mat.id)
+                                    ? "bg-green-500/10 border-green-500/40"
+                                    : "bg-[#0a1628] border-[#1e3a5f]"
+                                }`}
+                              >
                                 {isAdmin && !projectFinalized && editingMaterialId === mat.id ? (
                                   <>
                                     <input className="bg-[#0d2137] border border-blue-500 p-1.5 rounded-lg text-sm text-slate-200 flex-1 min-w-0 outline-none" value={editingMaterialName} onChange={(e) => setEditingMaterialName(e.target.value)} autoFocus />
@@ -1698,6 +1714,9 @@ function ProjectsPageInner() {
                                       }}
                                     />
                                     <span className="text-xs text-slate-500 w-8 shrink-0">{mat.unit}</span>
+                                    {savedFlashIds.has(mat.id) && (
+                                      <span className="text-green-400 text-sm shrink-0 animate-pulse">✓</span>
+                                    )}
                                     {isAdmin && !projectFinalized && (
                                       <>
                                         <button className="text-blue-400 hover:text-blue-300 text-sm px-1 shrink-0" onClick={() => { setEditingMaterialId(mat.id); setEditingMaterialName(mat.name); setEditingMaterialUnit(mat.unit); }}>✏️</button>
