@@ -1734,6 +1734,19 @@ function ProjectsPageInner() {
                                       onChange={(e) => {
                                         const val = e.target.value;
                                         setQuantities((prev) => ({ ...prev, [mat.id]: val }));
+                                        // Resetează bifa când valoarea se modifică
+                                        if (checkedMaterialIds.has(mat.id)) {
+                                          setCheckedMaterialIds((prev) => {
+                                            const next = new Set(prev);
+                                            next.delete(mat.id);
+                                            return next;
+                                          });
+                                          // Salvează debifat în baza de date
+                                          const existing = projectMaterials.find((pm) => pm.material_id === mat.id);
+                                          if (existing?.id) {
+                                            supabase.from("project_materials").update({ checked: false }).eq("id", existing.id);
+                                          }
+                                        }
                                         if (debounceRef.current) clearTimeout(debounceRef.current);
                                         debounceRef.current = setTimeout(() => autoSaveQuantity(mat.id, val, projectMaterials), 1000);
                                       }}
