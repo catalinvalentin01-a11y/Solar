@@ -588,6 +588,17 @@ function ProjectsPageInner() {
           type: "consum_proiect",
           note: `Proiect: ${form.client} - ${form.title}`,
         });
+
+        // Verificăm dacă stocul a scăzut sub pragul minim — trimitem notificare
+        const matInfo = materials.find((m) => m.id === material_id);
+        const minQty = matInfo?.min_quantity ?? 0;
+        if (minQty > 0 && newStock <= minQty) {
+          await supabase.from("notifications").insert({
+            title: "⚠️ Stoc scăzut",
+            message: `Materialul "${matInfo?.name}" a ajuns la ${newStock} ${matInfo?.unit} (prag minim: ${minQty} ${matInfo?.unit}). Aprovizionați stocul.`,
+            project_id: selectedProject.id,
+          });
+        }
       }
     }
 
