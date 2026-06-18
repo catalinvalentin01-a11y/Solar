@@ -48,6 +48,7 @@ export default function StocksPage() {
 
   const [materials, setMaterials] = useState<Material[]>([]);
   const [activeTab, setActiveTab] = useState<"all" | "montator" | "electrician" | "hala">("all");
+  const [stockSearch, setStockSearch] = useState("");
 
   const [adjustModal, setAdjustModal] = useState<AdjustModal>(null);
   const [adjustQty, setAdjustQty] = useState("");
@@ -506,8 +507,9 @@ export default function StocksPage() {
   }
 
   const filtered = materials.filter((m) => {
-    if (activeTab === "all") return true;
-    return m.role === activeTab;
+    const matchesTab = activeTab === "all" || m.role === activeTab;
+    const matchesSearch = m.name.toLowerCase().includes(stockSearch.toLowerCase());
+    return matchesTab && matchesSearch;
   });
 
   const lowStock = materials.filter(
@@ -623,6 +625,25 @@ export default function StocksPage() {
           ))}
         </div>
 
+        {/* Căutare materiale */}
+        <div className="relative mb-4">
+          <input
+            className="w-full bg-[#0a1628] border border-[#1e3a5f] focus:border-blue-500 p-2.5 pl-9 rounded-xl text-sm text-slate-200 placeholder-slate-500 outline-none transition"
+            placeholder="Caută material..."
+            value={stockSearch}
+            onChange={(e) => setStockSearch(e.target.value)}
+          />
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          {stockSearch && (
+            <button
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition"
+              onClick={() => setStockSearch("")}
+            >✕</button>
+          )}
+        </div>
+
         {/* Butoane adaugare */}
         <div className="flex flex-wrap gap-2 mb-4">
           <button
@@ -648,7 +669,7 @@ export default function StocksPage() {
         {/* Lista materiale */}
         {filtered.length === 0 ? (
           <div className="text-center py-16 text-slate-500 text-sm italic">
-            Nu există materiale{activeTab !== "all" ? ` pentru ${activeTab}` : ""}. Adaugă primul material mai sus.
+            {stockSearch ? `Niciun material găsit pentru "${stockSearch}".` : (activeTab !== "all" ? `Nu există materiale pentru ${activeTab}. Adaugă primul material mai sus.` : "Nu există materiale. Adaugă primul material mai sus.")}
           </div>
         ) : (
           <div className="space-y-2">
