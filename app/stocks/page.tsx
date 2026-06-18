@@ -508,7 +508,7 @@ export default function StocksPage() {
 
   const filtered = materials.filter((m) => {
     const matchesTab = activeTab === "all" || m.role === activeTab;
-    const matchesSearch = m.name.toLowerCase().includes(stockSearch.toLowerCase());
+    const matchesSearch = m.name.toLowerCase().includes(stockSearch.toLowerCase()) || (m.code && m.code.toLowerCase().includes(stockSearch.toLowerCase()));
     return matchesTab && matchesSearch;
   });
 
