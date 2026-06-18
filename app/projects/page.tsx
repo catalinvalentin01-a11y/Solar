@@ -47,6 +47,7 @@ type ProjectMaterial = {
   material_id: string;
   quantity: string;
   saved: boolean;
+  checked?: boolean;
 };
 
 type MontajCategory = {
@@ -111,7 +112,7 @@ function ProjectsPageInner() {
   const [newMaterialName, setNewMaterialName] = useState("");
   const [newMaterialUnit, setNewMaterialUnit] = useState("buc");
   const [autoSaving, setAutoSaving] = useState(false);
-  const [savedFlashIds, setSavedFlashIds] = useState<Set<string>>(new Set());
+  const [checkedMaterialIds, setCheckedMaterialIds] = useState<Set<string>>(new Set());
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   const [editingMaterialId, setEditingMaterialId] = useState<string | null>(null);
@@ -209,6 +210,7 @@ function ProjectsPageInner() {
     const q: Record<string, string> = {};
     rows.forEach((row) => { q[row.material_id] = row.quantity || ""; });
     setQuantities(q);
+    setCheckedMaterialIds(new Set(rows.filter((r) => r.checked === true).map((r) => r.material_id)));
     setMaterialsSavedMontator(rows.some((r) => r.saved === true));
     setMaterialsSavedElectrician(rows.some((r) => r.saved === true));
   }
@@ -465,16 +467,35 @@ function ProjectsPageInner() {
         if (data) setProjectMaterials((prev) => [...prev, data]);
       }
       setAutoSaving(false);
-      setSavedFlashIds((prev) => new Set(prev).add(materialId));
-      setTimeout(() => {
-        setSavedFlashIds((prev) => {
-          const next = new Set(prev);
-          next.delete(materialId);
-          return next;
-        });
-      }, 1200);
     },
     [selectedProject]
+  );
+
+  const toggleMaterialChecked = useCallback(
+    async (materialId: string, currentProjectMaterials: ProjectMaterial[]) => {
+      if (!selectedProject?.id) return;
+      const nextChecked = !checkedMaterialIds.has(materialId);
+
+      // Optimistic UI update
+      setCheckedMaterialIds((prev) => {
+        const next = new Set(prev);
+        if (nextChecked) next.add(materialId);
+        else next.delete(materialId);
+        return next;
+      });
+
+      const existing = currentProjectMaterials.find((pm) => pm.material_id === materialId);
+      if (existing?.id) {
+        await supabase.from("project_materials").update({ checked: nextChecked }).eq("id", existing.id);
+      } else {
+        // Materialul nu are încă rând în project_materials (cantitate neintrodusă) — îl creăm cu quantity ""
+        const { data } = await supabase.from("project_materials")
+          .insert({ project_id: selectedProject.id, material_id: materialId, quantity: "", saved: false, checked: nextChecked })
+          .select().single();
+        if (data) setProjectMaterials((prev) => [...prev, data]);
+      }
+    },
+    [selectedProject, checkedMaterialIds]
   );
 
   // ── LOGICA DE STOC ──────────────────────────────────────────────────────────
@@ -1654,11 +1675,15 @@ function ProjectsPageInner() {
                           </p>
                         ) : (
                           <div className="space-y-2">
-                            {activeMaterials.map((mat) => (
+                            {activeMaterials.map((mat) => {
+                              const isChecked = checkedMaterialIds.has(mat.id);
+                              const hasQty = (parseFloat(quantities[mat.id] || "0") || 0) > 0;
+                              const isCompleted = isChecked && hasQty;
+                              return (
                               <div
                                 key={mat.id}
-                                className={`flex items-center gap-2 p-2.5 rounded-xl border transition-colors duration-500 ${
-                                  savedFlashIds.has(mat.id)
+                                className={`flex items-center gap-2 p-2.5 rounded-xl border transition-colors ${
+                                  isCompleted
                                     ? "bg-green-500/10 border-green-500/40"
                                     : "bg-[#0a1628] border-[#1e3a5f]"
                                 }`}
@@ -1686,7 +1711,7 @@ function ProjectsPageInner() {
                                       <div className="shrink-0 w-10 h-10 rounded-lg border border-[#1e3a5f] bg-[#0a1628] flex items-center justify-center text-slate-600 text-xs">📦</div>
                                     )}
                                     <span className="min-w-0">
-                                      <span className="block">{mat.name}</span>
+                                      <span className={`block ${isCompleted ? "text-green-400" : ""}`}>{mat.name}</span>
                                       {mat.code && <span className="text-blue-400/70 font-mono text-xs">#{mat.code}</span>}
                                       <span className="text-slate-500 text-xs block">({mat.unit})</span>
                                       {mat.quantity !== undefined && (
@@ -1714,9 +1739,19 @@ function ProjectsPageInner() {
                                       }}
                                     />
                                     <span className="text-xs text-slate-500 w-8 shrink-0">{mat.unit}</span>
-                                    {savedFlashIds.has(mat.id) && (
-                                      <span className="text-green-400 text-sm shrink-0 animate-pulse">✓</span>
-                                    )}
+                                    <button
+                                      type="button"
+                                      title={isChecked ? "Bifat — apasă pentru a debifa" : "Marchează ca verificat"}
+                                      disabled={projectFinalized}
+                                      onClick={() => toggleMaterialChecked(mat.id, projectMaterials)}
+                                      className={`shrink-0 w-7 h-7 rounded-lg border flex items-center justify-center text-sm font-bold transition ${
+                                        isChecked
+                                          ? "bg-green-500/20 border-green-500/50 text-green-400"
+                                          : "bg-[#0a1628] border-[#1e3a5f] text-slate-600 hover:border-green-500/40 hover:text-green-500/60"
+                                      } ${projectFinalized ? "cursor-not-allowed opacity-60" : ""}`}
+                                    >
+                                      ✓
+                                    </button>
                                     {isAdmin && !projectFinalized && (
                                       <>
                                         <button className="text-blue-400 hover:text-blue-300 text-sm px-1 shrink-0" onClick={() => { setEditingMaterialId(mat.id); setEditingMaterialName(mat.name); setEditingMaterialUnit(mat.unit); }}>✏️</button>
@@ -1726,7 +1761,8 @@ function ProjectsPageInner() {
                                   </>
                                 )}
                               </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         )}
 
