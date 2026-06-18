@@ -13,6 +13,8 @@ type Material = {
   role: string;
   quantity: number;
   min_quantity: number;
+  code?: string | null;
+  photo_url?: string | null;
 };
 
 type StockMovement = {
@@ -66,6 +68,15 @@ export default function StocksPage() {
   const [editingName, setEditingName] = useState("");
   const [editingUnit, setEditingUnit] = useState("");
   const [editingMinQty, setEditingMinQty] = useState("");
+  const [editingCode, setEditingCode] = useState("");
+  const [editingPhotoUrl, setEditingPhotoUrl] = useState<string | null>(null);
+  const [editingUploading, setEditingUploading] = useState(false);
+
+  const [newCode, setNewCode] = useState("");
+  const [newPhotoUrl, setNewPhotoUrl] = useState<string | null>(null);
+  const [newPhotoUploading, setNewPhotoUploading] = useState(false);
+
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const check = async () => {
@@ -114,6 +125,17 @@ export default function StocksPage() {
     setMovementsLoading(false);
   }
 
+  async function uploadMaterialPhoto(file: File): Promise<string | null> {
+    const ext = file.name.split(".").pop();
+    const fileName = `materials/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const { error } = await supabase.storage
+      .from("project-images")
+      .upload(fileName, file, { upsert: false });
+    if (error) { alert("Eroare upload: " + error.message); return null; }
+    const { data } = supabase.storage.from("project-images").getPublicUrl(fileName);
+    return data.publicUrl;
+  }
+
   async function handleAddMaterial() {
     if (!addMaterialModal) return;
     const name = newName.trim();
@@ -124,9 +146,11 @@ export default function StocksPage() {
       role: addMaterialModal.role,
       quantity: 0,
       min_quantity: parseFloat(newMinQty) || 0,
+      code: newCode.trim() || null,
+      photo_url: newPhotoUrl || null,
     });
     if (error) { alert(error.message); return; }
-    setNewName(""); setNewUnit("buc"); setNewMinQty("");
+    setNewName(""); setNewUnit("buc"); setNewMinQty(""); setNewCode(""); setNewPhotoUrl(null);
     setAddMaterialModal(null);
     await loadMaterials();
   }
@@ -189,7 +213,7 @@ export default function StocksPage() {
     if (!name) return;
     const { error } = await supabase
       .from("materials")
-      .update({ name, unit: editingUnit, min_quantity: parseFloat(editingMinQty) || 0 })
+      .update({ name, unit: editingUnit, min_quantity: parseFloat(editingMinQty) || 0, code: editingCode.trim() || null, photo_url: editingPhotoUrl || null })
       .eq("id", id);
     if (error) { alert(error.message); return; }
     setEditingId(null);
@@ -299,10 +323,11 @@ export default function StocksPage() {
       doc.setFontSize(7);
       doc.setTextColor(100, 116, 139);
       doc.text("MATERIAL", margin + 3, y + 4);
-      doc.text("U.M.", margin + 100, y + 4);
-      doc.text("STOC CURENT", margin + 118, y + 4);
-      doc.text("STOC MINIM", margin + 145, y + 4);
-      doc.text("STATUS", margin + 168, y + 4);
+      doc.text("COD", margin + 85, y + 4);
+      doc.text("U.M.", margin + 108, y + 4);
+      doc.text("STOC CURENT", margin + 122, y + 4);
+      doc.text("STOC MINIM", margin + 148, y + 4);
+      doc.text("STATUS", margin + 170, y + 4);
       y += 7;
 
       // Rânduri materiale
@@ -326,21 +351,29 @@ export default function StocksPage() {
         doc.setTextColor(226, 232, 240);
         doc.text(m.name, margin + 3, y + 4.8);
 
+        // Cod material
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7);
+        doc.setTextColor(96, 165, 250);
+        doc.text((m as any).code || "—", margin + 85, y + 4.8);
+
         // U.M.
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
         doc.setTextColor(100, 116, 139);
-        doc.text(m.unit, margin + 100, y + 4.8);
+        doc.text(m.unit, margin + 108, y + 4.8);
 
         // Stoc curent
         doc.setFont("helvetica", "bold");
         doc.setFontSize(8.5);
         doc.setTextColor(isCritic ? 248 : isEmpty ? 100 : 74, isCritic ? 113 : isEmpty ? 116 : 222, isCritic ? 113 : isEmpty ? 139 : 128);
-        doc.text(String(qty), margin + 118, y + 4.8);
+        doc.text(String(qty), margin + 122, y + 4.8);
 
         // Stoc minim
         doc.setFont("helvetica", "normal");
         doc.setFontSize(7.5);
         doc.setTextColor(100, 116, 139);
-        doc.text(m.min_quantity > 0 ? String(m.min_quantity) : "—", margin + 145, y + 4.8);
+        doc.text(m.min_quantity > 0 ? String(m.min_quantity) : "—", margin + 148, y + 4.8);
 
         // Status badge
         const statusLabel = isCritic ? "CRITIC" : isEmpty ? "GOL" : "OK";
@@ -348,7 +381,7 @@ export default function StocksPage() {
         doc.setFont("helvetica", "bold");
         doc.setFontSize(7);
         doc.setTextColor(...statusColor);
-        doc.text(statusLabel, margin + 168, y + 4.8);
+        doc.text(statusLabel, margin + 170, y + 4.8);
 
         y += 7;
       });
@@ -628,31 +661,69 @@ export default function StocksPage() {
                   className="bg-[#0d1b2a] border border-[#1e3a5f] rounded-xl p-3 md:p-4 transition hover:border-blue-500/30"
                 >
                   {isEditing ? (
-                    <div className="flex flex-wrap gap-2 items-center">
-                      <input
-                        className="bg-[#0d2137] border border-blue-500 p-2 rounded-lg text-sm text-slate-200 flex-1 min-w-[140px] outline-none"
-                        value={editingName}
-                        onChange={(e) => setEditingName(e.target.value)}
-                        autoFocus
-                      />
-                      <input
-                        className="bg-[#0d2137] border border-[#1e3a5f] p-2 rounded-lg text-sm text-slate-200 w-20 outline-none"
-                        placeholder="U.M."
-                        value={editingUnit}
-                        onChange={(e) => setEditingUnit(e.target.value)}
-                      />
-                      <input
-                        type="number"
-                        className="bg-[#0d2137] border border-[#1e3a5f] p-2 rounded-lg text-sm text-slate-200 w-24 outline-none"
-                        placeholder="Stoc minim"
-                        value={editingMinQty}
-                        onChange={(e) => setEditingMinQty(e.target.value)}
-                      />
-                      <button className="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-semibold hover:bg-blue-500" onClick={() => handleSaveEdit(mat.id)}>✓</button>
-                      <button className="bg-[#1e3a5f] text-slate-300 px-3 py-2 rounded-lg text-sm font-semibold hover:bg-[#2a4a6f]" onClick={() => setEditingId(null)}>✕</button>
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap gap-2 items-center">
+                        <input
+                          className="bg-[#0d2137] border border-blue-500 p-2 rounded-lg text-sm text-slate-200 flex-1 min-w-[140px] outline-none"
+                          value={editingName}
+                          onChange={(e) => setEditingName(e.target.value)}
+                          autoFocus
+                        />
+                        <input
+                          className="bg-[#0d2137] border border-[#1e3a5f] p-2 rounded-lg text-sm text-slate-200 w-20 outline-none"
+                          placeholder="U.M."
+                          value={editingUnit}
+                          onChange={(e) => setEditingUnit(e.target.value)}
+                        />
+                        <input
+                          type="number"
+                          className="bg-[#0d2137] border border-[#1e3a5f] p-2 rounded-lg text-sm text-slate-200 w-24 outline-none"
+                          placeholder="Stoc minim"
+                          value={editingMinQty}
+                          onChange={(e) => setEditingMinQty(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex flex-wrap gap-2 items-center">
+                        <input
+                          className="bg-[#0d2137] border border-[#1e3a5f] p-2 rounded-lg text-sm text-slate-200 w-36 outline-none font-mono"
+                          placeholder="Cod material"
+                          value={editingCode}
+                          onChange={(e) => setEditingCode(e.target.value)}
+                        />
+                        <label className="cursor-pointer flex items-center gap-1.5 bg-[#1e3a5f] text-slate-300 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-[#2a4a6f] transition">
+                          {editingUploading ? "Se urcă..." : "📷 Schimbă poza"}
+                          <input type="file" accept="image/*" className="hidden" disabled={editingUploading} onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            setEditingUploading(true);
+                            const url = await uploadMaterialPhoto(file);
+                            if (url) setEditingPhotoUrl(url);
+                            setEditingUploading(false);
+                          }} />
+                        </label>
+                        {editingPhotoUrl && (
+                          <img src={editingPhotoUrl} alt="preview" className="w-10 h-10 rounded-lg object-cover border border-[#1e3a5f]" />
+                        )}
+                        <button className="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-semibold hover:bg-blue-500" onClick={() => handleSaveEdit(mat.id)}>✓</button>
+                        <button className="bg-[#1e3a5f] text-slate-300 px-3 py-2 rounded-lg text-sm font-semibold hover:bg-[#2a4a6f]" onClick={() => setEditingId(null)}>✕</button>
+                      </div>
                     </div>
                   ) : (
                     <div className="flex items-center gap-3">
+                      {/* Thumbnail poză */}
+                      {mat.photo_url ? (
+                        <button
+                          onClick={() => setLightboxUrl(mat.photo_url!)}
+                          className="shrink-0 w-12 h-12 rounded-lg overflow-hidden border border-[#1e3a5f] hover:border-blue-500/50 transition"
+                          title="Mărește poza"
+                        >
+                          <img src={mat.photo_url} alt={mat.name} className="w-full h-full object-cover" />
+                        </button>
+                      ) : (
+                        <div className="shrink-0 w-12 h-12 rounded-lg border border-[#1e3a5f] bg-[#0a1628] flex items-center justify-center text-slate-600 text-xs">
+                          📦
+                        </div>
+                      )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-semibold text-slate-200 text-sm">{mat.name}</span>
@@ -660,6 +731,9 @@ export default function StocksPage() {
                             {mat.role === "montator" ? "🔩 Montator" : mat.role === "electrician" ? "⚡ Electrician" : "🏪 Hală"}
                           </span>
                         </div>
+                        {mat.code && (
+                          <div className="text-xs text-blue-400/70 font-mono mt-0.5">#{mat.code}</div>
+                        )}
                         <div className="flex items-center gap-3 mt-1">
                           <span className="text-2xl font-bold text-white">{mat.quantity || 0}</span>
                           <span className="text-slate-500 text-sm">{mat.unit}</span>
@@ -694,7 +768,7 @@ export default function StocksPage() {
                         >📋</button>
                         <button
                           className="text-blue-400 hover:text-blue-300 w-8 h-8 flex items-center justify-center text-sm transition"
-                          onClick={() => { setEditingId(mat.id); setEditingName(mat.name); setEditingUnit(mat.unit); setEditingMinQty(String(mat.min_quantity || "")); }}
+                          onClick={() => { setEditingId(mat.id); setEditingName(mat.name); setEditingUnit(mat.unit); setEditingMinQty(String(mat.min_quantity || "")); setEditingCode(mat.code || ""); setEditingPhotoUrl(mat.photo_url || null); }}
                         >✏️</button>
                         <button
                           className="text-red-400 hover:text-red-300 w-8 h-8 flex items-center justify-center text-sm transition"
@@ -706,6 +780,20 @@ export default function StocksPage() {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Lightbox poză material */}
+        {lightboxUrl && (
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center" onClick={() => setLightboxUrl(null)}>
+            <div className="fixed inset-0 bg-black/90 backdrop-blur-sm" />
+            <div className="relative z-[100000] max-w-[90vw] max-h-[90vh]">
+              <img src={lightboxUrl} alt="Material" className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain" />
+              <button
+                className="absolute top-3 right-3 bg-black/60 text-white w-9 h-9 rounded-full flex items-center justify-center text-lg hover:bg-black/80 transition"
+                onClick={() => setLightboxUrl(null)}
+              >✕</button>
+            </div>
           </div>
         )}
 
@@ -806,6 +894,15 @@ export default function StocksPage() {
                     autoFocus
                   />
                 </div>
+                <div>
+                  <label className="text-xs text-blue-400 font-bold uppercase tracking-widest block mb-1">Cod material (opțional)</label>
+                  <input
+                    className="bg-[#0d2137] border border-[#1e3a5f] focus:border-blue-500 p-3 rounded-xl text-sm text-slate-200 placeholder-slate-500 outline-none transition w-full font-mono"
+                    placeholder="ex: CLM-35-BLU"
+                    value={newCode}
+                    onChange={(e) => setNewCode(e.target.value)}
+                  />
+                </div>
                 <div className="flex gap-2">
                   <div className="flex-1">
                     <label className="text-xs text-blue-400 font-bold uppercase tracking-widest block mb-1">Unitate măsură</label>
@@ -827,8 +924,30 @@ export default function StocksPage() {
                     />
                   </div>
                 </div>
+                <div>
+                  <label className="text-xs text-blue-400 font-bold uppercase tracking-widest block mb-1">Poză material (opțional)</label>
+                  <div className="flex items-center gap-3">
+                    <label className="cursor-pointer flex items-center gap-2 bg-[#0d2137] border border-[#1e3a5f] hover:border-blue-500 p-3 rounded-xl text-sm text-slate-400 hover:text-slate-200 outline-none transition flex-1">
+                      {newPhotoUploading ? "⏳ Se urcă..." : newPhotoUrl ? "✅ Poza adăugată" : "📷 Alege poză"}
+                      <input type="file" accept="image/*" className="hidden" disabled={newPhotoUploading} onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setNewPhotoUploading(true);
+                        const url = await uploadMaterialPhoto(file);
+                        if (url) setNewPhotoUrl(url);
+                        setNewPhotoUploading(false);
+                      }} />
+                    </label>
+                    {newPhotoUrl && (
+                      <div className="relative">
+                        <img src={newPhotoUrl} alt="preview" className="w-14 h-14 rounded-xl object-cover border border-[#1e3a5f]" />
+                        <button className="absolute -top-1.5 -right-1.5 bg-red-500 text-white w-4 h-4 rounded-full text-[10px] flex items-center justify-center" onClick={() => setNewPhotoUrl(null)}>✕</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
                 <div className="flex gap-2 pt-1">
-                  <button className="flex-1 bg-[#1e3a5f] text-slate-300 py-2.5 rounded-xl text-sm font-semibold hover:bg-[#2a4a6f] transition" onClick={() => setAddMaterialModal(null)}>Anulează</button>
+                  <button className="flex-1 bg-[#1e3a5f] text-slate-300 py-2.5 rounded-xl text-sm font-semibold hover:bg-[#2a4a6f] transition" onClick={() => { setAddMaterialModal(null); setNewCode(""); setNewPhotoUrl(null); }}>Anulează</button>
                   <button className="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-2.5 rounded-xl text-sm font-semibold transition" onClick={handleAddMaterial}>Adaugă</button>
                 </div>
               </div>
