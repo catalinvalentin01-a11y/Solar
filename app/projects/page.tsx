@@ -474,23 +474,22 @@ function ProjectsPageInner() {
   const toggleMaterialChecked = useCallback(
     async (materialId: string, currentProjectMaterials: ProjectMaterial[]) => {
       if (!selectedProject?.id) return;
-      const nextChecked = !checkedMaterialIds.has(materialId);
+      // Bifa e doar intr-un sens — se poate seta, nu debifa manual
 
-      // Optimistic UI update
+
       setCheckedMaterialIds((prev) => {
         const next = new Set(prev);
-        if (nextChecked) next.add(materialId);
-        else next.delete(materialId);
+        next.add(materialId);
         return next;
       });
 
       const existing = currentProjectMaterials.find((pm) => pm.material_id === materialId);
       if (existing?.id) {
-        await supabase.from("project_materials").update({ checked: nextChecked }).eq("id", existing.id);
+        await supabase.from("project_materials").update({ checked: true }).eq("id", existing.id);
       } else {
         // Materialul nu are încă rând în project_materials (cantitate neintrodusă) — îl creăm cu quantity ""
         const { data } = await supabase.from("project_materials")
-          .insert({ project_id: selectedProject.id, material_id: materialId, quantity: "", saved: false, checked: nextChecked })
+          .insert({ project_id: selectedProject.id, material_id: materialId, quantity: "", saved: false, checked: true })
           .select().single();
         if (data) setProjectMaterials((prev) => [...prev, data]);
       }
@@ -1754,8 +1753,8 @@ function ProjectsPageInner() {
                                     <span className="text-xs text-slate-500 w-8 shrink-0">{mat.unit}</span>
                                     <button
                                       type="button"
-                                      title={isChecked ? "Bifat — apasă pentru a debifa" : "Marchează ca verificat"}
-                                      disabled={projectFinalized}
+                                      title={isChecked ? "Bifat ✓" : "Marchează ca verificat"}
+                                      disabled={projectFinalized || isChecked}
                                       onClick={() => toggleMaterialChecked(mat.id, projectMaterials)}
                                       className={`shrink-0 w-7 h-7 rounded-lg border flex items-center justify-center text-sm font-bold transition ${
                                         isChecked
