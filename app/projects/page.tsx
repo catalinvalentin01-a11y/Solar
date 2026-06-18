@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback, Suspense } from "react";
+import React, { useEffect, useState, useRef, useCallback, Suspense } from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
@@ -74,6 +74,73 @@ export default function ProjectsPage() {
   );
 }
 
+function SolarLoader() {
+  const ROWS = 5, COLS = 7, TOTAL = ROWS * COLS;
+  const [litCells, setLitCells] = React.useState<Set<number>>(new Set());
+
+  React.useEffect(() => {
+    const order: {idx: number; diag: number}[] = [];
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++)
+        order.push({ idx: r * COLS + c, diag: r + c });
+    const groups: Record<number, number[]> = {};
+    order.forEach(({ idx, diag }) => {
+      if (!groups[diag]) groups[diag] = [];
+      groups[diag].push(idx);
+    });
+    const diagKeys = Object.keys(groups).map(Number).sort((a, b) => a - b);
+
+    let step = 0;
+    let running = true;
+
+    function runWave() {
+      if (!running) return;
+      setLitCells(new Set());
+      step = 0;
+      const t = setInterval(() => {
+        if (!running) { clearInterval(t); return; }
+        if (step >= diagKeys.length) {
+          clearInterval(t);
+          setTimeout(() => { if (running) runWave(); }, 700);
+          return;
+        }
+        setLitCells(prev => {
+          const next = new Set(prev);
+          groups[diagKeys[step]].forEach(i => next.add(i));
+          return next;
+        });
+        step++;
+      }, 75);
+    }
+    runWave();
+    return () => { running = false; };
+  }, []);
+
+  return (
+    <div style={{background:'#060f1e',borderRadius:'10px',padding:'8px',border:'1px solid #1e3a5f',position:'relative',overflow:'hidden'}}>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(7, 36px)',gridTemplateRows:'repeat(5, 22px)',gap:'3px',position:'relative',zIndex:1}}>
+        {Array.from({length: TOTAL}, (_, i) => (
+          <div key={i} style={{
+            borderRadius:'3px',
+            background: litCells.has(i) ? '#1e3a5f' : '#0d1f35',
+            border: litCells.has(i) ? '0.5px solid #3b82f6' : '0.5px solid #1e3a5f',
+            boxShadow: litCells.has(i) ? '0 0 5px rgba(59,130,246,0.35)' : 'none',
+            transition:'background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease',
+            position:'relative',
+            overflow:'hidden',
+          }}>
+            {litCells.has(i) && (
+              <div style={{position:'absolute',top:'1px',left:'1px',right:'1px',height:'38%',background:'rgba(147,197,253,0.1)',borderRadius:'2px 2px 0 0'}} />
+            )}
+          </div>
+        ))}
+      </div>
+      <div style={{position:'absolute',inset:0,background:'linear-gradient(105deg, transparent 25%, rgba(59,130,246,0.06) 50%, transparent 75%)',animation:'solarShimmer 2.2s ease-in-out infinite',pointerEvents:'none',zIndex:2}} />
+      <style>{`@keyframes solarShimmer { 0% { transform: translateX(-100%); } 65%,100% { transform: translateX(200%); } }`}</style>
+    </div>
+  );
+}
+
 function ProjectsPageInner() {
   const [events, setEvents] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
@@ -113,6 +180,7 @@ function ProjectsPageInner() {
   const [newMaterialUnit, setNewMaterialUnit] = useState("buc");
   const [autoSaving, setAutoSaving] = useState(false);
   const [checkedMaterialIds, setCheckedMaterialIds] = useState<Set<string>>(new Set());
+  const [loadingProject, setLoadingProject] = useState(false);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   const [editingMaterialId, setEditingMaterialId] = useState<string | null>(null);
@@ -239,6 +307,17 @@ function ProjectsPageInner() {
     setMontajSaved(rows.some((r) => r.saved === true));
   }
 
+  async function openProjectModal(projectId: string, isSuperAdminUser: boolean) {
+    setLoadingProject(true);
+    setOpen(true);
+    await Promise.all([
+      loadProjectMaterials(projectId),
+      loadMontajImages(projectId),
+      ...(isSuperAdminUser ? [loadHistory(projectId)] : []),
+    ]);
+    setLoadingProject(false);
+  }
+
   useEffect(() => {
     loadProjects();
     loadMaterials();
@@ -263,10 +342,7 @@ function ProjectsPageInner() {
       setProjectFinalized(p.status === "Finalizat");
       setShowClient(false); setShowTechnical(false); setShowRoof(false);
       setShowSimulation(false); setShowMaterials(false); setShowMontaj(false);
-      loadProjectMaterials(p.id);
-      loadMontajImages(p.id);
-      if (isSuperAdmin) loadHistory(p.id);
-      setOpen(true);
+      openProjectModal(p.id, isSuperAdmin);
     };
     tryOpen();
   }, [searchParams]);
@@ -1169,9 +1245,7 @@ function ProjectsPageInner() {
                       setShowClient(false); setShowTechnical(false); setShowRoof(false);
                       setShowSimulation(false); setShowMaterials(false); setShowMontaj(false);
                       setActiveMaterialRole("montator");
-                      loadProjectMaterials(p.id!);
-                      loadMontajImages(p.id!);
-                      setOpen(true);
+                      openProjectModal(p.id!, isSuperAdmin);
                     }}
                   >
                     <div className="min-w-0 flex-1">
@@ -1224,10 +1298,7 @@ function ProjectsPageInner() {
               setShowClient(false); setShowTechnical(false); setShowRoof(false);
               setShowSimulation(false); setShowMaterials(false); setShowMontaj(false);
               setActiveMaterialRole("montator");
-              loadProjectMaterials(info.event.id);
-              loadMontajImages(info.event.id);
-              if (isSuperAdmin) loadHistory(info.event.id);
-              setOpen(true);
+              openProjectModal(info.event.id, isSuperAdmin);
             }}
           />
         </div>
@@ -1237,7 +1308,10 @@ function ProjectsPageInner() {
             <div className="fixed inset-0 bg-black/75 backdrop-blur-sm" onClick={() => setOpen(false)} />
 
             <div className="sb-modal relative bg-[#0d1b2a] rounded-2xl border border-[#1e3a5f] w-[95vw] md:w-[900px] max-h-[90vh] overflow-y-auto z-[10000] shadow-[0_0_60px_rgba(37,99,235,0.15)]">
-
+              {loadingProject ? (
+                <SolarLoader />
+              ) : (
+              <>
               <div className="sticky top-0 z-10 flex justify-between items-center px-5 py-4 bg-[#0a1628] border-b border-[#1e3a5f] rounded-t-2xl">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#facc15] to-[#f59e0b] flex items-center justify-center shadow-[0_0_12px_rgba(250,204,21,0.4)]">
@@ -1936,6 +2010,8 @@ function ProjectsPageInner() {
                 )}
 
               </div>
+              </>
+              )}
             </div>
           </div>
         )}
