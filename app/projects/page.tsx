@@ -180,6 +180,7 @@ function ProjectsPageInner() {
   const [newMaterialUnit, setNewMaterialUnit] = useState("buc");
   const [autoSaving, setAutoSaving] = useState(false);
   const [checkedMaterialIds, setCheckedMaterialIds] = useState<Set<string>>(new Set());
+  const [materialSearch, setMaterialSearch] = useState("");
   const [loadingProject, setLoadingProject] = useState(false);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -1716,13 +1717,13 @@ function ProjectsPageInner() {
                         <div className="flex border-b border-[#1e3a5f]">
                           <button
                             className={`px-5 py-2.5 text-sm font-semibold border-b-2 transition-colors ${activeMaterialRole === "montator" ? "border-blue-500 text-blue-400" : "border-transparent text-slate-500 hover:text-slate-300"}`}
-                            onClick={() => { setActiveMaterialRole("montator"); setEditingMaterialId(null); }}
+                            onClick={() => { setActiveMaterialRole("montator"); setEditingMaterialId(null); setMaterialSearch(""); }}
                           >
                             🔩 Montator
                           </button>
                           <button
                             className={`px-5 py-2.5 text-sm font-semibold border-b-2 transition-colors ${activeMaterialRole === "electrician" ? "border-yellow-500 text-yellow-400" : "border-transparent text-slate-500 hover:text-slate-300"}`}
-                            onClick={() => { setActiveMaterialRole("electrician"); setEditingMaterialId(null); }}
+                            onClick={() => { setActiveMaterialRole("electrician"); setEditingMaterialId(null); setMaterialSearch(""); }}
                           >
                             ⚡ Electrician
                           </button>
@@ -1751,6 +1752,20 @@ function ProjectsPageInner() {
                           </div>
                         )}
 
+                        {activeMaterials.length > 0 && (
+                          <div className="relative">
+                            <input
+                              className="w-full bg-[#0d2137] border border-[#1e3a5f] focus:border-blue-500 p-2.5 pl-9 rounded-xl text-sm text-slate-200 placeholder-slate-500 outline-none transition"
+                              placeholder="Caută material..."
+                              value={materialSearch}
+                              onChange={(e) => setMaterialSearch(e.target.value)}
+                            />
+                            <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                            </svg>
+                          </div>
+                        )}
+
                         {activeMaterials.length === 0 ? (
                           <p className="text-sm text-slate-500 italic">
                             {isAdmin
@@ -1759,7 +1774,10 @@ function ProjectsPageInner() {
                           </p>
                         ) : (
                           <div className="space-y-2">
-                            {activeMaterials.map((mat) => {
+                            {activeMaterials.filter(m => m.name.toLowerCase().includes(materialSearch.toLowerCase())).length === 0 && materialSearch ? (
+                              <p className="text-sm text-slate-500 italic">Niciun material găsit pentru &ldquo;{materialSearch}&rdquo;.</p>
+                            ) : null}
+                            {activeMaterials.filter(m => m.name.toLowerCase().includes(materialSearch.toLowerCase())).map((mat) => {
                               const isChecked = checkedMaterialIds.has(mat.id);
                               const hasQty = (parseFloat(quantities[mat.id] || "0") || 0) > 0;
                               const isCompleted = isChecked && hasQty;
