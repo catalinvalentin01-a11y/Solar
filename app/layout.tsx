@@ -2,7 +2,7 @@
 
 import "./globals.css";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter, usePathname } from "next/navigation";
 import NotificationBell from "@/components/NotificationBell";
@@ -15,6 +15,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const [mobileOpen, setMobileOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
+  const [loadingPage, setLoadingPage] = useState(false);
+  const prevPathname = useRef(pathname);
 
   const checkAdmin = async (userEmail: string) => {
     if (userEmail === SUPER_ADMIN) { setIsAdmin(true); return; }
@@ -47,6 +49,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
   useEffect(() => {
     setMobileOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (prevPathname.current !== pathname) {
+      setLoadingPage(true);
+      const t = setTimeout(() => {
+        setLoadingPage(false);
+        prevPathname.current = pathname;
+      }, 600);
+      return () => clearTimeout(t);
+    }
   }, [pathname]);
 
   const handleLogout = async () => {
@@ -216,17 +229,106 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div className="hidden md:flex flex-1 min-h-screen">
           <Sidebar />
           <main className="flex-1 bg-[#0d1b2a] overflow-auto">
-            {children}
+            {loadingPage ? <PageLoader /> : children}
           </main>
         </div>
 
         {/* ── MOBILE CONTENT ── */}
         <main className="md:hidden flex-1 bg-[#0d1b2a] overflow-auto">
-          {children}
+          {loadingPage ? <PageLoader /> : children}
         </main>
 
       </body>
     </html>
+  );
+}
+
+
+/* ── Page Loader ── */
+function PageLoader() {
+  const ROWS = 5, COLS = 7, TOTAL = ROWS * COLS;
+  const [litCells, setLitCells] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    const groups: Record<number, number[]> = {};
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++) {
+        const diag = r + c;
+        if (!groups[diag]) groups[diag] = [];
+        groups[diag].push(r * COLS + c);
+      }
+    const diagKeys = Object.keys(groups).map(Number).sort((a, b) => a - b);
+    let step = 0;
+    let running = true;
+
+    function runWave() {
+      if (!running) return;
+      setLitCells(new Set());
+      step = 0;
+      const t = setInterval(() => {
+        if (!running) { clearInterval(t); return; }
+        if (step >= diagKeys.length) {
+          clearInterval(t);
+          setTimeout(() => { if (running) runWave(); }, 700);
+          return;
+        }
+        setLitCells(prev => {
+          const next = new Set(prev);
+          groups[diagKeys[step]].forEach(i => next.add(i));
+          return next;
+        });
+        step++;
+      }, 75);
+    }
+    runWave();
+    return () => { running = false; };
+  }, []);
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',minHeight:'400px',gap:'28px'}}>
+      <div style={{position:'relative',width:'64px',height:'64px',display:'flex',alignItems:'center',justifyContent:'center'}}>
+        <svg style={{position:'absolute',inset:0,width:'100%',height:'100%',animation:'solarSpin 10s linear infinite'}} viewBox="0 0 64 64">
+          <g stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" opacity="0.6">
+            <line x1="32" y1="3" x2="32" y2="10"/><line x1="32" y1="54" x2="32" y2="61"/>
+            <line x1="3" y1="32" x2="10" y2="32"/><line x1="54" y1="32" x2="61" y2="32"/>
+            <line x1="10" y1="10" x2="15" y2="15"/><line x1="49" y1="49" x2="54" y2="54"/>
+            <line x1="54" y1="10" x2="49" y2="15"/><line x1="10" y1="54" x2="15" y2="49"/>
+          </g>
+        </svg>
+        <div style={{width:'28px',height:'28px',borderRadius:'50%',background:'#3b82f6',zIndex:2,position:'relative',boxShadow:'0 0 20px rgba(59,130,246,0.7)',animation:'solarCorePulse 2s ease-in-out infinite'}} />
+      </div>
+
+      <div style={{background:'#060f1e',borderRadius:'10px',padding:'8px',border:'1px solid #1e3a5f',position:'relative',overflow:'hidden'}}>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(7, 36px)',gridTemplateRows:'repeat(5, 22px)',gap:'3px',position:'relative',zIndex:1}}>
+          {Array.from({length: TOTAL}, (_, i) => (
+            <div key={i} style={{
+              borderRadius:'3px',
+              background: litCells.has(i) ? '#1e3a5f' : '#0d1f35',
+              border: litCells.has(i) ? '0.5px solid #3b82f6' : '0.5px solid #1e3a5f',
+              boxShadow: litCells.has(i) ? '0 0 5px rgba(59,130,246,0.35)' : 'none',
+              transition:'background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease',
+              position:'relative',
+              overflow:'hidden',
+            }}>
+              {litCells.has(i) && (
+                <div style={{position:'absolute',top:'1px',left:'1px',right:'1px',height:'38%',background:'rgba(147,197,253,0.1)',borderRadius:'2px 2px 0 0'}} />
+              )}
+            </div>
+          ))}
+        </div>
+        <div style={{position:'absolute',inset:0,background:'linear-gradient(105deg, transparent 25%, rgba(59,130,246,0.06) 50%, transparent 75%)',animation:'solarShimmer 2.2s ease-in-out infinite',pointerEvents:'none',zIndex:2}} />
+      </div>
+
+      <p style={{fontSize:'12px',color:'#475569',letterSpacing:'0.1em',textTransform:'uppercase'}}>
+        Solar <span style={{color:'#3b82f6',fontWeight:500}}>Blu</span>
+      </p>
+
+      <style>{`
+        @keyframes solarSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes solarCorePulse { 0%,100% { box-shadow: 0 0 12px rgba(59,130,246,0.4); } 50% { box-shadow: 0 0 24px rgba(59,130,246,0.8); } }
+        @keyframes solarShimmer { 0% { transform: translateX(-100%); } 65%,100% { transform: translateX(200%); } }
+      `}</style>
+    </div>
   );
 }
 
