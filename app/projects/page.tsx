@@ -37,6 +37,8 @@ type Material = {
   role: string;
   quantity?: number;
   min_quantity?: number;
+  code?: string | null;
+  photo_url?: string | null;
 };
 
 type ProjectMaterial = {
@@ -126,6 +128,8 @@ function ProjectsPageInner() {
 
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState("");
+
+  const [materialLightboxUrl, setMaterialLightboxUrl] = useState<string | null>(null);
 
   const dragCatRef = useRef<string | null>(null);
   const dragOverCatRef = useRef<string | null>(null);
@@ -1617,19 +1621,34 @@ function ProjectsPageInner() {
                                   </>
                                 ) : (
                                   <>
-                                   <span className="flex-1 text-sm font-medium text-slate-200 min-w-0">
-  <span className="block">{mat.name}</span>
-  <span className="text-slate-500 text-xs">({mat.unit})</span>
-  {mat.quantity !== undefined && (
-    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full inline-block mt-0.5 ${
-      mat.quantity <= (mat.min_quantity ?? 0)
-        ? "bg-red-500/20 text-red-400 border border-red-500/30"
-        : "bg-slate-700/50 text-slate-400"
-    }`}>
-      Stoc: {mat.quantity} {mat.unit}
-    </span>
-  )}
-</span>
+                                   <span className="flex-1 text-sm font-medium text-slate-200 min-w-0 flex items-center gap-2">
+                                    {/* Thumbnail poză material */}
+                                    {mat.photo_url ? (
+                                      <button
+                                        onClick={() => setMaterialLightboxUrl(mat.photo_url!)}
+                                        className="shrink-0 w-10 h-10 rounded-lg overflow-hidden border border-[#1e3a5f] hover:border-blue-500/50 transition"
+                                        title="Mărește poza"
+                                      >
+                                        <img src={mat.photo_url} alt={mat.name} className="w-full h-full object-cover" />
+                                      </button>
+                                    ) : (
+                                      <div className="shrink-0 w-10 h-10 rounded-lg border border-[#1e3a5f] bg-[#0a1628] flex items-center justify-center text-slate-600 text-xs">📦</div>
+                                    )}
+                                    <span className="min-w-0">
+                                      <span className="block">{mat.name}</span>
+                                      {mat.code && <span className="text-blue-400/70 font-mono text-xs">#{mat.code}</span>}
+                                      <span className="text-slate-500 text-xs block">({mat.unit})</span>
+                                      {mat.quantity !== undefined && (
+                                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full inline-block mt-0.5 ${
+                                          mat.quantity <= (mat.min_quantity ?? 0)
+                                            ? "bg-red-500/20 text-red-400 border border-red-500/30"
+                                            : "bg-slate-700/50 text-slate-400"
+                                        }`}>
+                                          Stoc: {mat.quantity} {mat.unit}
+                                        </span>
+                                      )}
+                                    </span>
+                                  </span>
                                     <input
                                       type="number" min="0"
                                       className={`border p-2 rounded-xl text-sm text-center w-20 shrink-0 outline-none transition ${(materialsSaved && !isAdmin) || projectFinalized ? "bg-[#0a1628] border-[#1e3a5f] text-slate-500 cursor-not-allowed" : "bg-[#0d2137] border-[#1e3a5f] text-slate-200 focus:border-blue-500"}`}
@@ -1804,6 +1823,20 @@ function ProjectsPageInner() {
                 )}
 
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Lightbox poză material */}
+        {materialLightboxUrl && (
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center" onClick={() => setMaterialLightboxUrl(null)}>
+            <div className="fixed inset-0 bg-black/90 backdrop-blur-sm" />
+            <div className="relative z-[100000] max-w-[90vw] max-h-[90vh]">
+              <img src={materialLightboxUrl} alt="Material" className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain" />
+              <button
+                className="absolute top-3 right-3 bg-black/60 text-white w-9 h-9 rounded-full flex items-center justify-center text-lg hover:bg-black/80 transition"
+                onClick={() => setMaterialLightboxUrl(null)}
+              >✕</button>
             </div>
           </div>
         )}
