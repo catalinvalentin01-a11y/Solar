@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import AuthGuard from "@/components/AuthGuard";
 
 export default function Page() {
   const [stats, setStats] = useState({ active: 0, finalized: 0, todayCount: 0, total: 0 });
@@ -31,6 +32,7 @@ export default function Page() {
   const val = (n: number) => loading ? "—" : String(n);
 
   return (
+    <AuthGuard>
     <div className="p-4 md:p-8">
 
       {/* Header */}
@@ -106,5 +108,6 @@ export default function Page() {
       </div>
 
     </div>
+    </AuthGuard>
   );
 }
