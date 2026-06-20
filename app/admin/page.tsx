@@ -49,7 +49,8 @@ export default function AdminPage() {
     setLoading(false);
   };
 
-  const updateStatus = async (id: string, status: string) => {
+  const updateStatus = async (id: string, status: string, email: string) => {
+    if (email === SUPER_ADMIN) return; // super adminul nu poate fi revocat/respins de nimeni
     await supabase
       .from("user_access")
       .update({ status, updated_at: new Date().toISOString() })
@@ -102,13 +103,13 @@ export default function AdminPage() {
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => updateStatus(r.id, "approved")}
+                    onClick={() => updateStatus(r.id, "approved", r.email)}
                     className="bg-green-500 text-white px-4 py-1.5 rounded-lg text-sm font-medium"
                   >
                     Aprobă
                   </button>
                   <button
-                    onClick={() => updateStatus(r.id, "rejected")}
+                    onClick={() => updateStatus(r.id, "rejected", r.email)}
                     className="bg-red-500 text-white px-4 py-1.5 rounded-lg text-sm font-medium"
                   >
                     Respinge
@@ -183,12 +184,16 @@ export default function AdminPage() {
                 <p className="font-medium text-white">{r.email}</p>
                 {r.is_admin && <p className="text-xs text-yellow-600">Admin</p>}
               </div>
-              <button
-                onClick={() => updateStatus(r.id, "rejected")}
-                className="text-xs text-red-400 underline"
-              >
-                Revocă acces
-              </button>
+              {r.email === SUPER_ADMIN ? (
+                <span className="text-xs text-slate-500 italic">Protejat</span>
+              ) : (
+                <button
+                  onClick={() => updateStatus(r.id, "rejected", r.email)}
+                  className="text-xs text-red-400 underline"
+                >
+                  Revocă acces
+                </button>
+              )}
             </div>
           ))}
           {approved.length === 0 && (
@@ -208,7 +213,7 @@ export default function AdminPage() {
               <div key={r.id} className="flex items-center justify-between border rounded-xl p-4">
                 <p className="font-medium text-gray-400">{r.email}</p>
                 <button
-                  onClick={() => updateStatus(r.id, "approved")}
+                  onClick={() => updateStatus(r.id, "approved", r.email)}
                   className="text-xs text-green-500 underline"
                 >
                   Aprobă
